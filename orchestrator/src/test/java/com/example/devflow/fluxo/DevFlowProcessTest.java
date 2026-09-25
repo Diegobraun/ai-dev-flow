@@ -179,6 +179,24 @@ class DevFlowProcessTest {
         assertThat(instancia).isActive().hasActiveIncidents();
     }
 
+    @Test
+    void inicioPeloFormularioAssumeBranchMainETresRodadas() {
+        ProcessInstanceEvent instancia = client.newCreateInstanceCommand()
+                .bpmnProcessId("dev-flow")
+                .latestVersion()
+                .variables(Map.of(
+                        "tarefa", "validar-cpf",
+                        "descricao", "Validar CPF no cadastro",
+                        "repositorio", "/tmp/customer-service"))
+                .send()
+                .join();
+
+        assertThat(instancia).hasActiveElements("aprovar-refinamento")
+                .hasVariable("branchBase", "main")
+                .hasVariable("limiteDeRevisoes", 3);
+        verify(workspaces).preparar("validar-cpf", "/tmp/customer-service", "main");
+    }
+
     private void responder(Etapa etapa, String... jsons) {
         respostas.put(etapa, new ArrayDeque<>(List.of(jsons)));
     }

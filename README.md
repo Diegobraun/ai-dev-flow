@@ -135,6 +135,11 @@ As portas do Camunda (8180, 26600, 9210) não são as padrão para não conflita
 
 ### Rodar uma tarefa
 
+Pelo Tasklist: aba **Processes**, "Fluxo de desenvolvimento com agentes", **Start process**. O formulário pede
+identificador, descrição, repositório, branch base e o limite de rodadas de review.
+
+Pelo terminal:
+
 ```bash
 scripts/devflow.sh nova https://github.com/Diegobraun/system-graph-payment-service.git \
   "Criar um limite diário de PIX por conta..." main limite-diario-pix

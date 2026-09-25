@@ -15,6 +15,16 @@
   <bpmn:process id="dev-flow" name="Fluxo de desenvolvimento com agentes" isExecutable="true">
 
     <bpmn:startEvent id="tarefa-recebida" name="Tarefa recebida">
+      <bpmn:extensionElements>
+        <zeebe:formDefinition formId="nova-tarefa" />
+        <zeebe:ioMapping>
+          <zeebe:output source="=tarefa" target="tarefa" />
+          <zeebe:output source="=descricao" target="descricao" />
+          <zeebe:output source="=repositorio" target="repositorio" />
+          <zeebe:output source="=if branchBase = null or branchBase = &quot;&quot; then &quot;main&quot; else branchBase" target="branchBase" />
+          <zeebe:output source="=if limiteDeRevisoes = null then 3 else limiteDeRevisoes" target="limiteDeRevisoes" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
       <bpmn:outgoing>f-inicio</bpmn:outgoing>
     </bpmn:startEvent>
 

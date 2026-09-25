@@ -1,0 +1,77 @@
+{
+  "components": [
+    {
+      "type": "text",
+      "text": "# Nova tarefa\n\nO devflow clona o repositório, cria a branch `devflow/<tarefa>` e passa a tarefa por refinamento, desenvolvimento, code review e teste integrado. Você aprova o refinamento e o pull request.",
+      "id": "nova-tarefa-0"
+    },
+    {
+      "type": "textfield",
+      "label": "Identificador",
+      "key": "tarefa",
+      "description": "Minúsculas, números e hífen. Vira o nome da branch e da pasta .devflow/",
+      "validate": {
+        "required": true,
+        "pattern": "^[a-z0-9][a-z0-9-]{1,60}$"
+      },
+      "id": "nova-tarefa-1"
+    },
+    {
+      "type": "textarea",
+      "label": "Descrição",
+      "key": "descricao",
+      "description": "O pedido como viria no ticket. O refinador pergunta o que faltar.",
+      "validate": {
+        "required": true
+      },
+      "id": "nova-tarefa-2"
+    },
+    {
+      "type": "textfield",
+      "label": "Repositório",
+      "key": "repositorio",
+      "description": "URL git ou caminho local na máquina do worker",
+      "validate": {
+        "required": true
+      },
+      "id": "nova-tarefa-3"
+    },
+    {
+      "type": "textfield",
+      "label": "Branch base",
+      "key": "branchBase",
+      "defaultValue": "main",
+      "validate": {
+        "required": true
+      },
+      "layout": {
+        "columns": 8
+      },
+      "id": "nova-tarefa-4"
+    },
+    {
+      "type": "number",
+      "label": "Rodadas de review antes de chamar um humano",
+      "key": "limiteDeRevisoes",
+      "defaultValue": 3,
+      "validate": {
+        "required": true,
+        "min": 1,
+        "max": 10
+      },
+      "layout": {
+        "columns": 8
+      },
+      "id": "nova-tarefa-5"
+    }
+  ],
+  "type": "default",
+  "id": "nova-tarefa",
+  "executionPlatform": "Camunda Cloud",
+  "executionPlatformVersion": "8.8.0",
+  "exporter": {
+    "name": "devflow",
+    "version": "0.1.0"
+  },
+  "schemaVersion": 16
+}
