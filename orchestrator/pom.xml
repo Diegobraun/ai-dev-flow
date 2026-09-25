@@ -36,6 +36,16 @@
       <version>${camunda.version}</version>
     </dependency>
     <dependency>
+      <groupId>org.webjars.npm</groupId>
+      <artifactId>marked</artifactId>
+      <version>15.0.12</version>
+    </dependency>
+    <dependency>
+      <groupId>org.webjars.npm</groupId>
+      <artifactId>dompurify</artifactId>
+      <version>3.2.6</version>
+    </dependency>
+    <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-test</artifactId>
       <scope>test</scope>
