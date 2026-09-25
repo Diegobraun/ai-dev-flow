@@ -412,10 +412,11 @@ button.sucesso { background: linear-gradient(135deg, #1fbf8a, #2ee6a6); color: #
 .proximo.erro { --c: var(--error); }
 .proximo.ok { --c: var(--ok); }
 .proximo.neutro { --c: var(--muted); }
+.proximo.lento { --c: var(--warning); }
 .proximo h2 { margin: 0 0 4px; font-size: 17px; }
 .proximo p { margin: 0; color: #c7cfe4; font-size: 13.5px; line-height: 1.5; overflow-wrap: anywhere; }
 .proximo .icone { flex: 0 0 12px; width: 12px; height: 12px; margin-top: 6px; border-radius: 50%; background: var(--c); box-shadow: 0 0 0 5px color-mix(in srgb, var(--c) 20%, transparent), 0 0 18px var(--c); }
-.proximo.agente .icone, .proximo.voce .icone { animation: pulsar 1.6s ease-in-out infinite; }
+.proximo.agente .icone, .proximo.voce .icone, .proximo.lento .icone { animation: pulsar 1.6s ease-in-out infinite; }
 @keyframes pulsar { 50% { box-shadow: 0 0 0 9px color-mix(in srgb, var(--c) 6%, transparent), 0 0 26px var(--c); } }
 .principal #acoes:not(:empty) { margin-bottom: 14px; display: flex; flex-direction: column; gap: 12px; }
 .perguntas { display: flex; flex-direction: column; gap: 10px; }

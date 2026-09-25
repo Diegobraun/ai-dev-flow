@@ -747,7 +747,12 @@ function desenharProximo(detalhe) {
     const [nome, descricao] = ativo ? TRABALHO_DOS_AGENTES[ativo.elementId] : ['O fluxo está andando', 'Passando para a próxima etapa.'];
     tipo = 'agente';
     titulo = nome;
+    const minutos = ativo?.inicio ? (Date.now() - new Date(ativo.inicio).getTime()) / 60000 : 0;
     texto = `${esc(descricao)}${ativo?.inicio ? ` <span class="muted">Começou ${esc(relativo(ativo.inicio))}. Costuma levar de 1 a 3 minutos.</span>` : ''}`;
+    if (minutos > 8) {
+      tipo = 'lento';
+      texto += `<br><b>Está demorando mais que o normal.</b> <span class="muted">Um build ou teste pode estar esperando algo que não está no ar (Kafka, banco). O log do agente fica em <code>workspaces/${esc(resumo.tarefa)}/.devflow/${esc(resumo.tarefa)}/logs/</code>. O limite da etapa é 45 minutos.</span>`;
+    }
   }
   alvo.hidden = false;
   alvo.className = `proximo glass ${tipo}`;

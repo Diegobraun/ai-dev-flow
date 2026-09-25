@@ -59,4 +59,9 @@ Esperado ..., obtido .... Trecho do erro:
 - Não marque critério como coberto se o teste não exercita o comportamento de verdade (por exemplo, mockando a
   própria classe que implementa a regra).
 - Não use `@Disabled`, não aumente timeout para esconder lentidão, não apague teste que falha.
+- O teste não pode depender de infraestrutura rodando na máquina (Kafka, banco, outro serviço). Um
+  `@SpringBootTest` com Spring Cloud Stream ou spring-kafka fica pendurado esperando o broker. Use o test binder
+  do Stream, `@EmbeddedKafka`, `MockProducer` ou exclua a autoconfiguração do Kafka no teste; clients HTTP vão
+  para `MockRestServiceServer` ou WireMock. Se um `mvn verify` passar de 5 minutos, pare e procure o que está
+  esperando rede.
 - `resultado: falhou` se qualquer critério falhar ou se a suíte completa tiver falha nova.
