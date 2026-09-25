@@ -13,6 +13,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -271,11 +272,13 @@ public class Painel {
     private List<AreaAfetada> areas(Map<String, JsonNode> doProcesso, Map<String, Map<String, JsonNode>> locais,
                                     List<PassoDoHistorico> historico, List<Pendencia> pendencias) {
         Map<String, JsonNode> porArea = new LinkedHashMap<>();
+        Set<String> atuais = new HashSet<>();
         JsonNode afetadas = doProcesso.get("areasAfetadas");
         if (afetadas != null && afetadas.isArray()) {
             afetadas.forEach(a -> {
                 if (a.hasNonNull("area")) {
                     porArea.put(a.path("area").asText(), a);
+                    atuais.add(a.path("area").asText());
                 }
             });
         }
@@ -315,7 +318,11 @@ public class Painel {
                     .filter(p -> area.equals(p.area()) || escopos.contains(p.elementInstanceKey()))
                     .findFirst()
                     .orElse(null);
-            if (aberta != null) {
+            boolean retirada = afetadas != null && afetadas.isArray() && !atuais.contains(area);
+            if (retirada) {
+                status = "retirada";
+                motivo = resposta != null && resposta.hasNonNull("motivo") ? resposta.path("motivo").asText() : null;
+            } else if (aberta != null) {
                 status = "pendente";
                 userTaskKey = aberta.userTaskKey();
             } else if (resposta != null && resposta.path("aprovado").isBoolean()) {

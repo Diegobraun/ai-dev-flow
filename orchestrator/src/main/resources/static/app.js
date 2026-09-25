@@ -660,18 +660,19 @@ function desenharAreas(detalhe) {
     return;
   }
   const aprovadas = areas.filter(a => a.status === 'aprovada').length;
-  const rotulos = { aprovada: 'aprovada', recusada: 'recusada', pendente: 'aguardando decisão', respondida: 'respondida', aguardando: 'ainda não chamada' };
-  const classes = { aprovada: 'ok', recusada: 'erro', pendente: 'alerta pulsa', respondida: 'info', aguardando: 'neutro' };
+  const atuais = areas.filter(a => a.status !== 'retirada').length;
+  const rotulos = { aprovada: 'aprovada', recusada: 'recusada', pendente: 'aguardando decisão', respondida: 'respondida', aguardando: 'ainda não chamada', retirada: 'fora do refinamento atual' };
+  const classes = { aprovada: 'ok', recusada: 'erro', pendente: 'alerta pulsa', respondida: 'info', aguardando: 'neutro', retirada: 'neutro' };
   $('#areas').innerHTML = `
     <section class="painel glass">
-      <h3>Áreas afetadas · ${aprovadas}/${areas.length} aprovadas</h3>
+      <h3>Áreas afetadas · ${aprovadas}/${atuais} aprovadas</h3>
       <ul class="lista">${areas.map(a => `
         <li class="area ${esc(a.status)}">
           <div class="row"><strong>${esc(a.area)}</strong><span class="badge ${classes[a.status] || 'neutro'}">${esc(rotulos[a.status] || a.status)}</span></div>
           ${lista(a.times).length ? `<div class="sub">times: ${esc(lista(a.times).map(textoDe).join(', '))}</div>` : ''}
           ${lista(a.servicos).length ? `<div class="sub">serviços: ${esc(lista(a.servicos).map(textoDe).join(', '))}</div>` : ''}
           ${lista(a.contratos).length ? `<div class="sub">contratos: ${esc(lista(a.contratos).map(textoDe).join(', '))}</div>` : ''}
-          ${a.motivo ? `<div class="sub">motivo: ${esc(a.motivo)}</div>` : ''}
+          ${a.motivo ? `<div class="sub">${a.status === 'retirada' ? 'recusou numa rodada anterior' : 'motivo'}: ${esc(a.motivo)}</div>` : ''}
         </li>`).join('')}
       </ul>
     </section>`;

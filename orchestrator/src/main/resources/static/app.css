@@ -428,6 +428,7 @@ button.sucesso { background: linear-gradient(135deg, #1fbf8a, #2ee6a6); color: #
 .area::before { content: ""; position: absolute; left: 0; top: 10px; bottom: 10px; width: 3px; border-radius: 3px; background: var(--c, var(--border)); box-shadow: 0 0 10px var(--c, transparent); }
 .area.aprovada { --c: var(--ok); }
 .area.recusada { --c: var(--error); }
+.area.retirada { opacity: .65; }
 .area.pendente { --c: var(--warning); }
 
 .incidente { --c: var(--error); border: 1px solid color-mix(in srgb, var(--error) 40%, transparent); background: color-mix(in srgb, var(--error) 7%, var(--glass-strong)); }

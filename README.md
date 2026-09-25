@@ -157,9 +157,11 @@ e `GET /api/grupos`. Não há autenticação: é para rodar na máquina de quem 
 
 ![Quadro](docs/img/interface-quadro.jpg)
 
-![Tarefa concluída: linha do tempo, voltas e corpo do PR](docs/img/interface-tarefa.jpg)
+![Tarefa renda-no-account-opened concluída: duas rodadas de refinamento, pagamentos recusou e saiu do escopo](docs/img/interface-tarefa.jpg)
 
-![Aprovação entre áreas](docs/img/interface-areas.jpg)
+![Painel de aprovação entre áreas](docs/img/interface-areas.jpg)
+
+*O painel de aprovação entre áreas, com as duas tarefas da primeira rodada reabertas só na tela para a captura.*
 
 ### Rodar uma tarefa
 
@@ -259,6 +261,26 @@ flowchart LR
 
 Sem o system-graph, os dois escrevem "consumidores externos não verificados" e o fluxo segue sem aprovação entre
 áreas.
+
+## Exemplo real com áreas
+
+[`docs/exemplo/renda-no-account-opened`](docs/exemplo/renda-no-account-opened): incluir a renda mensal do
+cliente no evento `account-opened` do [account-service](https://github.com/Diegobraun/system-graph-account-service),
+área contas, com o MCP da área (branch `areas` do system-graph).
+
+| Etapa | Custo | Tempo | Resultado |
+|---|---|---|---|
+| Refinamento, rodada 1 | US$ 0,40 | 56 s | campo novo no `account-opened`; `impact_of_change` aponta credito (loan-service) e pagamentos (notification-service); pergunta sobre privacidade da renda |
+| Aprovação entre áreas | | | credito aprova; pagamentos recusa: o notification-service não pode receber renda (LGPD) |
+| Refinamento, rodada 2 | US$ 0,36 | 66 s | redesenho: `account-opened` intacto, tópico novo `account-opened-income` só para o loan-service; só credito afetada |
+| Aprovação entre áreas | | | credito aprova |
+| Desenvolvimento | US$ 0,64 | 113 s | tópico e evento novos, publisher, 2 commits com testes unitários |
+| Code review | US$ 0,42 | 52 s | `aprovado`; confere no `impact_of_change` que o diff não afeta pagamentos e que credito aprovou |
+| Teste integrado | US$ 0,94 | 176 s | 5 critérios em `@SpringBootTest`, 11 testes na suíte, 0 falhas |
+| **Total** | **US$ 2,76** | **~8 min de agente** | 3 commits, [`diff.patch`](docs/exemplo/renda-no-account-opened/diff.patch), PR aprovado pela interface |
+
+O custo é o `total_cost_usd` que o `claude -p` informa: o preço equivalente na API. Com login de assinatura
+(Pro, Max) o uso sai do limite do plano; só com `ANTHROPIC_API_KEY` vira cobrança por token.
 
 ## Exemplo real
 

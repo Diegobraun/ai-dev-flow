@@ -1,0 +1,472 @@
+diff --git a/src/main/java/com/example/account/account/AccountService.java b/src/main/java/com/example/account/account/AccountService.java
+index 6ab0e83..1adffd3 100644
+--- a/src/main/java/com/example/account/account/AccountService.java
++++ b/src/main/java/com/example/account/account/AccountService.java
+@@ -1,5 +1,6 @@
+ package com.example.account.account;
+ 
++import com.example.account.customer.Customer;
+ import com.example.account.customer.CustomerRepository;
+ import com.example.account.loan.LoanClient;
+ import com.example.account.loan.LoanSummary;
+@@ -31,10 +32,10 @@ public class AccountService {
+     }
+ 
+     public Account open(Long customerId) {
+-        customers.findById(customerId)
++        Customer customer = customers.findById(customerId)
+                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "customer not found"));
+         Account account = accounts.save(new Account(accounts.nextId(), customerId, BigDecimal.ZERO, AccountStatus.PENDING_KYC, Instant.now()));
+-        publisher.accountOpened(account);
++        publisher.accountOpened(account, customer);
+         return account;
+     }
+ 
+diff --git a/src/main/java/com/example/account/messaging/AccountEventPublisher.java b/src/main/java/com/example/account/messaging/AccountEventPublisher.java
+index 09263fb..416daf2 100644
+--- a/src/main/java/com/example/account/messaging/AccountEventPublisher.java
++++ b/src/main/java/com/example/account/messaging/AccountEventPublisher.java
+@@ -1,20 +1,25 @@
+ package com.example.account.messaging;
+ 
+ import com.example.account.account.Account;
++import com.example.account.customer.Customer;
+ import org.springframework.kafka.core.KafkaTemplate;
+ import org.springframework.stereotype.Component;
+ 
+ @Component
+ public class AccountEventPublisher {
+ 
+-    private final KafkaTemplate<String, AccountOpenedEvent> kafkaTemplate;
++    private final KafkaTemplate<String, Object> kafkaTemplate;
+ 
+-    public AccountEventPublisher(KafkaTemplate<String, AccountOpenedEvent> kafkaTemplate) {
++    public AccountEventPublisher(KafkaTemplate<String, Object> kafkaTemplate) {
+         this.kafkaTemplate = kafkaTemplate;
+     }
+ 
+-    public void accountOpened(Account account) {
++    public void accountOpened(Account account, Customer customer) {
++        String key = account.id().toString();
+         AccountOpenedEvent event = new AccountOpenedEvent(account.id(), account.customerId(), account.openedAt());
+-        kafkaTemplate.send(Topics.ACCOUNT_OPENED, account.id().toString(), event);
++        kafkaTemplate.send(Topics.ACCOUNT_OPENED, key, event);
++        AccountOpenedIncomeEvent incomeEvent = new AccountOpenedIncomeEvent(
++                account.id(), account.customerId(), account.openedAt(), customer.monthlyIncome());
++        kafkaTemplate.send(Topics.ACCOUNT_OPENED_INCOME, key, incomeEvent);
+     }
+ }
+diff --git a/src/main/java/com/example/account/messaging/AccountOpenedIncomeEvent.java b/src/main/java/com/example/account/messaging/AccountOpenedIncomeEvent.java
+new file mode 100644
+index 0000000..8a92c6a
+--- /dev/null
++++ b/src/main/java/com/example/account/messaging/AccountOpenedIncomeEvent.java
+@@ -0,0 +1,7 @@
++package com.example.account.messaging;
++
++import java.math.BigDecimal;
++import java.time.Instant;
++
++public record AccountOpenedIncomeEvent(Long accountId, Long customerId, Instant openedAt, BigDecimal monthlyIncome) {
++}
+diff --git a/src/main/java/com/example/account/messaging/Topics.java b/src/main/java/com/example/account/messaging/Topics.java
+index c7b636e..0cb8958 100644
+--- a/src/main/java/com/example/account/messaging/Topics.java
++++ b/src/main/java/com/example/account/messaging/Topics.java
+@@ -3,6 +3,7 @@ package com.example.account.messaging;
+ public final class Topics {
+ 
+     public static final String ACCOUNT_OPENED = "account-opened";
++    public static final String ACCOUNT_OPENED_INCOME = "account-opened-income";
+ 
+     private Topics() {
+     }
+diff --git a/src/test/java/com/example/account/account/AccountOpenedIncomeIntegrationTest.java b/src/test/java/com/example/account/account/AccountOpenedIncomeIntegrationTest.java
+new file mode 100644
+index 0000000..e5f5a33
+--- /dev/null
++++ b/src/test/java/com/example/account/account/AccountOpenedIncomeIntegrationTest.java
+@@ -0,0 +1,212 @@
++package com.example.account.account;
++
++import static org.assertj.core.api.Assertions.assertThat;
++import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
++import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
++
++import com.example.account.messaging.Topics;
++import com.fasterxml.jackson.databind.JsonNode;
++import com.fasterxml.jackson.databind.ObjectMapper;
++import java.math.BigDecimal;
++import java.nio.charset.StandardCharsets;
++import java.util.List;
++import java.util.Map;
++import org.apache.kafka.clients.producer.MockProducer;
++import org.apache.kafka.clients.producer.ProducerRecord;
++import org.apache.kafka.common.serialization.Serializer;
++import org.apache.kafka.common.serialization.StringSerializer;
++import org.junit.jupiter.api.BeforeEach;
++import org.junit.jupiter.api.Test;
++import org.springframework.beans.BeanUtils;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.boot.autoconfigure.kafka.KafkaProperties;
++import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
++import org.springframework.boot.test.context.SpringBootTest;
++import org.springframework.boot.test.context.TestConfiguration;
++import org.springframework.context.annotation.Bean;
++import org.springframework.http.MediaType;
++import org.springframework.kafka.core.KafkaTemplate;
++import org.springframework.kafka.mock.MockProducerFactory;
++import org.springframework.test.web.servlet.MockMvc;
++
++/**
++ * Testes de aceite da tarefa renda-no-account-opened.
++ *
++ * <p>A aplicação sobe inteira: controllers, serviço, repositórios e o publisher real. Só o transporte Kafka é
++ * trocado. O {@link KafkaTemplate} usa um {@link MockProducer} com o value serializer configurado em
++ * {@code application.yml} (JsonSerializer, sem type headers). O JSON conferido é o que iria para o broker.
++ */
++@SpringBootTest(properties = "spring.kafka.listener.auto-startup=false")
++@AutoConfigureMockMvc
++class AccountOpenedIncomeIntegrationTest {
++
++    @TestConfiguration
++    static class KafkaMockConfig {
++
++        @Bean
++        @SuppressWarnings("unchecked")
++        Serializer<Object> producerValueSerializer(KafkaProperties properties) {
++            Map<String, Object> config = properties.buildProducerProperties(null);
++            Serializer<Object> serializer =
++                    (Serializer<Object>) BeanUtils.instantiateClass(properties.getProducer().getValueSerializer());
++            serializer.configure(config, false);
++            return serializer;
++        }
++
++        @Bean
++        MockProducer<String, Object> mockProducer(Serializer<Object> producerValueSerializer) {
++            // O KafkaTemplate fecha o producer depois de cada envio. Aqui ele é compartilhado entre os testes.
++            return new MockProducer<>(true, null, new StringSerializer(), producerValueSerializer) {
++                @Override
++                public void close() {
++                }
++
++                @Override
++                public void close(java.time.Duration timeout) {
++                }
++            };
++        }
++
++        @Bean
++        KafkaTemplate<String, Object> kafkaTemplate(MockProducer<String, Object> mockProducer) {
++            return new KafkaTemplate<>(new MockProducerFactory<>(() -> mockProducer));
++        }
++    }
++
++    /** Mesmo formato do {@code com.example.loan.messaging.AccountOpenedEvent} do loan-service. */
++    record LoanServiceAccountOpenedEvent(Long accountId, Long customerId, BigDecimal monthlyIncome) {
++    }
++
++    @Autowired
++    MockMvc mvc;
++
++    @Autowired
++    MockProducer<String, Object> producer;
++
++    @Autowired
++    Serializer<Object> producerValueSerializer;
++
++    @Autowired
++    ObjectMapper objectMapper;
++
++    @BeforeEach
++    void clearSentRecords() {
++        producer.clear();
++    }
++
++    @Test
++    void criterio1_publicaRendaNoTopicoAccountOpenedIncomeComChaveAccountId() throws Exception {
++        long customerId = createCustomer("8500.00");
++        long accountId = openAccount(customerId);
++
++        List<ProducerRecord<String, Object>> income = sentTo(Topics.ACCOUNT_OPENED_INCOME);
++        assertThat(income).hasSize(1);
++        assertThat(income.get(0).key()).isEqualTo(String.valueOf(accountId));
++
++        JsonNode json = json(income.get(0));
++        assertThat(json.get("accountId").asLong()).isEqualTo(accountId);
++        assertThat(json.get("customerId").asLong()).isEqualTo(customerId);
++        assertThat(json.hasNonNull("openedAt")).isTrue();
++        assertThat(json.get("monthlyIncome").isNumber()).isTrue();
++        BigDecimal monthlyIncome = json.get("monthlyIncome").decimalValue();
++        assertThat(monthlyIncome).isEqualByComparingTo("8500.00");
++        assertThat(monthlyIncome.scale()).isEqualTo(2);
++        assertThat(rawJson(income.get(0))).contains("\"monthlyIncome\":8500.00");
++    }
++
++    @Test
++    void criterio2_accountOpenedMantemSoAccountIdCustomerIdOpenedAtSemRenda() throws Exception {
++        long customerId = createCustomer("8500.00");
++        long accountId = openAccount(customerId);
++
++        List<ProducerRecord<String, Object>> opened = sentTo(Topics.ACCOUNT_OPENED);
++        assertThat(opened).hasSize(1);
++        assertThat(opened.get(0).key()).isEqualTo(String.valueOf(accountId));
++
++        JsonNode json = json(opened.get(0));
++        assertThat(json.properties()).extracting(Map.Entry::getKey)
++                .containsExactlyInAnyOrder("accountId", "customerId", "openedAt");
++        assertThat(json.get("accountId").asLong()).isEqualTo(accountId);
++        assertThat(json.get("customerId").asLong()).isEqualTo(customerId);
++        assertThat(rawJson(opened.get(0))).doesNotContain("monthlyIncome").doesNotContain("8500");
++        assertThat(opened.get(0).headers().toArray()).as("sem type headers").isEmpty();
++    }
++
++    @Test
++    void criterio3_rendaZeroEPublicadaComoZeroENaoNull() throws Exception {
++        long customerId = createCustomer("0");
++        openAccount(customerId);
++
++        List<ProducerRecord<String, Object>> income = sentTo(Topics.ACCOUNT_OPENED_INCOME);
++        assertThat(income).hasSize(1);
++        JsonNode monthlyIncome = json(income.get(0)).get("monthlyIncome");
++        assertThat(monthlyIncome).isNotNull();
++        assertThat(monthlyIncome.isNull()).isFalse();
++        assertThat(monthlyIncome.decimalValue()).isEqualByComparingTo(BigDecimal.ZERO);
++    }
++
++    @Test
++    void criterio4_clienteInexistenteRetorna422ENaoPublicaEmNenhumTopico() throws Exception {
++        mvc.perform(post("/accounts")
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content("{\"customerId\": 999999}"))
++                .andExpect(status().isUnprocessableEntity())
++                .andExpect(result -> assertThat(result.getResolvedException())
++                        .hasMessageContaining("customer not found"));
++
++        assertThat(producer.history()).isEmpty();
++    }
++
++    @Test
++    void criterio5_jsonDeAccountOpenedIncomeEhLidoPeloRecordDoLoanService() throws Exception {
++        long customerId = createCustomer("8500.00");
++        long accountId = openAccount(customerId);
++
++        ProducerRecord<String, Object> record = sentTo(Topics.ACCOUNT_OPENED_INCOME).get(0);
++        LoanServiceAccountOpenedEvent read = objectMapper.readValue(bytes(record), LoanServiceAccountOpenedEvent.class);
++
++        assertThat(read.accountId()).isEqualTo(accountId);
++        assertThat(read.customerId()).isEqualTo(customerId);
++        assertThat(read.monthlyIncome()).isNotNull().isEqualByComparingTo("8500.00");
++    }
++
++    private long createCustomer(String monthlyIncome) throws Exception {
++        String body = mvc.perform(post("/customers")
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content("{\"name\":\"Maria\",\"document\":\"12345678900\",\"monthlyIncome\":" + monthlyIncome + "}"))
++                .andExpect(status().isCreated())
++                .andReturn().getResponse().getContentAsString();
++        return objectMapper.readTree(body).get("id").asLong();
++    }
++
++    private long openAccount(long customerId) throws Exception {
++        String body = mvc.perform(post("/accounts")
++                        .contentType(MediaType.APPLICATION_JSON)
++                        .content("{\"customerId\":" + customerId + "}"))
++                .andExpect(status().isCreated())
++                .andExpect(jsonPath("$.customerId").value(customerId))
++                .andReturn().getResponse().getContentAsString();
++        return objectMapper.readTree(body).get("id").asLong();
++    }
++
++    private List<ProducerRecord<String, Object>> sentTo(String topic) {
++        return producer.history().stream().filter(r -> topic.equals(r.topic())).toList();
++    }
++
++    private byte[] bytes(ProducerRecord<String, Object> record) {
++        return producerValueSerializer.serialize(record.topic(), record.headers(), record.value());
++    }
++
++    private String rawJson(ProducerRecord<String, Object> record) {
++        return new String(bytes(record), StandardCharsets.UTF_8);
++    }
++
++    private JsonNode json(ProducerRecord<String, Object> record) throws Exception {
++        // Lê números decimais como BigDecimal, sem remover zeros à direita, para conferir valor e escala.
++        return objectMapper.reader()
++                .with(com.fasterxml.jackson.databind.DeserializationFeature.USE_BIG_DECIMAL_FOR_FLOATS)
++                .without(com.fasterxml.jackson.databind.cfg.JsonNodeFeature.STRIP_TRAILING_BIGDECIMAL_ZEROES)
++                .readTree(bytes(record));
++    }
++}
+diff --git a/src/test/java/com/example/account/account/AccountServiceTest.java b/src/test/java/com/example/account/account/AccountServiceTest.java
+new file mode 100644
+index 0000000..536f282
+--- /dev/null
++++ b/src/test/java/com/example/account/account/AccountServiceTest.java
+@@ -0,0 +1,46 @@
++package com.example.account.account;
++
++import static org.assertj.core.api.Assertions.assertThat;
++import static org.assertj.core.api.Assertions.assertThatThrownBy;
++import static org.mockito.Mockito.mock;
++import static org.mockito.Mockito.verify;
++import static org.mockito.Mockito.verifyNoInteractions;
++
++import com.example.account.customer.Customer;
++import com.example.account.customer.CustomerRepository;
++import com.example.account.loan.LoanClient;
++import com.example.account.messaging.AccountEventPublisher;
++import java.math.BigDecimal;
++import java.time.Instant;
++import org.junit.jupiter.api.Test;
++import org.springframework.http.HttpStatus;
++import org.springframework.web.server.ResponseStatusException;
++
++class AccountServiceTest {
++
++    private final AccountRepository accounts = new AccountRepository();
++    private final CustomerRepository customers = new CustomerRepository();
++    private final AccountEventPublisher publisher = mock(AccountEventPublisher.class);
++    private final AccountService service = new AccountService(accounts, customers, publisher, mock(LoanClient.class));
++
++    @Test
++    void openPassesLoadedCustomerToPublisher() {
++        Customer customer = customers.save(new Customer(customers.nextId(), "Maria", "12345678900",
++                new BigDecimal("8500.00"), Instant.now()));
++
++        Account account = service.open(customer.id());
++
++        assertThat(account.customerId()).isEqualTo(customer.id());
++        verify(publisher).accountOpened(account, customer);
++    }
++
++    @Test
++    void openWithUnknownCustomerFailsAndPublishesNothing() {
++        assertThatThrownBy(() -> service.open(999L))
++                .isInstanceOf(ResponseStatusException.class)
++                .satisfies(e -> assertThat(((ResponseStatusException) e).getStatusCode())
++                        .isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY));
++
++        verifyNoInteractions(publisher);
++    }
++}
+diff --git a/src/test/java/com/example/account/messaging/AccountEventPublisherTest.java b/src/test/java/com/example/account/messaging/AccountEventPublisherTest.java
+new file mode 100644
+index 0000000..c185531
+--- /dev/null
++++ b/src/test/java/com/example/account/messaging/AccountEventPublisherTest.java
+@@ -0,0 +1,113 @@
++package com.example.account.messaging;
++
++import static org.assertj.core.api.Assertions.assertThat;
++import static org.mockito.ArgumentMatchers.anyString;
++import static org.mockito.ArgumentMatchers.eq;
++import static org.mockito.Mockito.mock;
++import static org.mockito.Mockito.times;
++import static org.mockito.Mockito.verify;
++
++import com.example.account.account.Account;
++import com.example.account.account.AccountStatus;
++import com.example.account.customer.Customer;
++import com.fasterxml.jackson.databind.JsonNode;
++import com.fasterxml.jackson.databind.ObjectMapper;
++import java.math.BigDecimal;
++import java.time.Instant;
++import java.util.List;
++import org.junit.jupiter.api.Test;
++import org.mockito.ArgumentCaptor;
++import org.springframework.kafka.core.KafkaTemplate;
++import org.springframework.kafka.support.JacksonUtils;
++import org.springframework.kafka.support.serializer.JsonSerializer;
++
++class AccountEventPublisherTest {
++
++    private static final Instant OPENED_AT = Instant.parse("2026-09-25T12:00:00Z");
++
++    @SuppressWarnings("unchecked")
++    private final KafkaTemplate<String, Object> kafkaTemplate = mock(KafkaTemplate.class);
++    private final AccountEventPublisher publisher = new AccountEventPublisher(kafkaTemplate);
++
++    @Test
++    void publishesIncomeOnlyOnDedicatedTopicWithAccountIdKey() {
++        publisher.accountOpened(account(), customer(new BigDecimal("8500.00")));
++
++        ArgumentCaptor<String> topics = ArgumentCaptor.forClass(String.class);
++        ArgumentCaptor<String> keys = ArgumentCaptor.forClass(String.class);
++        ArgumentCaptor<Object> payloads = ArgumentCaptor.forClass(Object.class);
++        verify(kafkaTemplate, times(2)).send(topics.capture(), keys.capture(), payloads.capture());
++
++        assertThat(topics.getAllValues()).containsExactly(Topics.ACCOUNT_OPENED, Topics.ACCOUNT_OPENED_INCOME);
++        assertThat(keys.getAllValues()).containsOnly("1001");
++
++        List<Object> sent = payloads.getAllValues();
++        assertThat(sent.get(0)).isEqualTo(new AccountOpenedEvent(1001L, 7L, OPENED_AT));
++
++        AccountOpenedIncomeEvent income = (AccountOpenedIncomeEvent) sent.get(1);
++        assertThat(income.accountId()).isEqualTo(1001L);
++        assertThat(income.customerId()).isEqualTo(7L);
++        assertThat(income.openedAt()).isEqualTo(OPENED_AT);
++        assertThat(income.monthlyIncome()).isEqualByComparingTo("8500.00");
++        assertThat(income.monthlyIncome().scale()).isEqualTo(2);
++    }
++
++    @Test
++    void accountOpenedJsonKeepsOnlyOriginalFields() throws Exception {
++        publisher.accountOpened(account(), customer(new BigDecimal("8500.00")));
++
++        ArgumentCaptor<Object> payload = ArgumentCaptor.forClass(Object.class);
++        verify(kafkaTemplate).send(eq(Topics.ACCOUNT_OPENED), anyString(), payload.capture());
++
++        JsonNode json = new ObjectMapper().readTree(serialize(Topics.ACCOUNT_OPENED, payload.getValue()));
++        assertThat(json.properties()).extracting(java.util.Map.Entry::getKey)
++                .containsExactlyInAnyOrder("accountId", "customerId", "openedAt");
++    }
++
++    @Test
++    void zeroIncomeIsPublishedAsZeroNotNull() throws Exception {
++        publisher.accountOpened(account(), customer(BigDecimal.ZERO));
++
++        ArgumentCaptor<Object> payload = ArgumentCaptor.forClass(Object.class);
++        verify(kafkaTemplate).send(eq(Topics.ACCOUNT_OPENED_INCOME), anyString(), payload.capture());
++
++        AccountOpenedIncomeEvent income = (AccountOpenedIncomeEvent) payload.getValue();
++        assertThat(income.monthlyIncome()).isNotNull().isEqualByComparingTo(BigDecimal.ZERO);
++
++        JsonNode json = new ObjectMapper().readTree(serialize(Topics.ACCOUNT_OPENED_INCOME, income));
++        assertThat(json.get("monthlyIncome").isNull()).isFalse();
++        assertThat(json.get("monthlyIncome").decimalValue()).isEqualByComparingTo(BigDecimal.ZERO);
++    }
++
++    @Test
++    void incomeEventIsReadableByLoanServiceShapedRecord() throws Exception {
++        AccountOpenedIncomeEvent event = new AccountOpenedIncomeEvent(1001L, 7L, OPENED_AT, new BigDecimal("8500.00"));
++
++        byte[] json = serialize(Topics.ACCOUNT_OPENED_INCOME, event);
++        LoanAccountOpenedEvent read = JacksonUtils.enhancedObjectMapper().readValue(json, LoanAccountOpenedEvent.class);
++
++        assertThat(read.accountId()).isEqualTo(1001L);
++        assertThat(read.customerId()).isEqualTo(7L);
++        assertThat(read.monthlyIncome()).isEqualByComparingTo("8500.00");
++        assertThat(read.monthlyIncome().scale()).isEqualTo(2);
++    }
++
++    private static byte[] serialize(String topic, Object payload) {
++        try (JsonSerializer<Object> serializer = new JsonSerializer<>()) {
++            serializer.setAddTypeInfo(false);
++            return serializer.serialize(topic, payload);
++        }
++    }
++
++    private static Account account() {
++        return new Account(1001L, 7L, BigDecimal.ZERO, AccountStatus.PENDING_KYC, OPENED_AT);
++    }
++
++    private static Customer customer(BigDecimal monthlyIncome) {
++        return new Customer(7L, "Maria", "12345678900", monthlyIncome, Instant.parse("2026-01-01T00:00:00Z"));
++    }
++
++    /** Mesmo formato do {@code com.example.loan.messaging.AccountOpenedEvent} do loan-service. */
++    record LoanAccountOpenedEvent(Long accountId, Long customerId, BigDecimal monthlyIncome) {
++    }
++}
