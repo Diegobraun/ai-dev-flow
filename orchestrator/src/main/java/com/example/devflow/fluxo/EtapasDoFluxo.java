@@ -65,11 +65,19 @@ public class EtapasDoFluxo {
                                        @Variable(name = "rodadaDeRefinamento") int rodadaAnterior,
                                        @Variable(name = "observacoesDoRefinamento", optional = true) String observacoes,
                                        @Variable(name = "aprovacoesEntreAreas", optional = true) List<Map<String, Object>> aprovacoes,
+                                       @Variable(name = "refinamentoAprovado", optional = true) Boolean aprovado,
+                                       @Variable(name = "refinamentoStatus", optional = true) String statusAnterior,
+                                       @Variable(name = "rodadaDeRevisao", optional = true) Integer rodadaDeRevisao,
+                                       @Variable(name = "limiteDeRevisoes", optional = true) Integer limiteDeRevisoes,
+                                       @Variable(name = "revisoesPorRefinamento", optional = true) Integer revisoesPorRefinamento,
                                        @Variable(name = "custoUsd") double custo) {
         Path diretorio = Path.of(workspace);
         int rodada = rodadaAnterior + 1;
+        boolean aceitarSugestoes = Boolean.TRUE.equals(aprovado) && "com-perguntas".equals(statusAnterior);
         ResultadoDoAgente resultado = executar(Etapa.REFINAMENTO, diretorio, tarefa, "refinamento-" + rodada,
-                Prompts.refinamento(tarefa, descricao, rodada > 1 ? observacoes : null, recusas(aprovacoes)));
+                Prompts.refinamento(tarefa, descricao, rodada > 1 ? observacoes : null, recusas(aprovacoes), aceitarSugestoes));
+        int porRefinamento = revisoesPorRefinamento != null ? revisoesPorRefinamento
+                : limiteDeRevisoes != null ? limiteDeRevisoes : properties.limiteDeRevisoes();
         Map<String, Object> variaveis = new HashMap<>();
         variaveis.put("rodadaDeRefinamento", rodada);
         variaveis.put("refinamentoStatus", resultado.texto("status"));
@@ -80,6 +88,9 @@ public class EtapasDoFluxo {
         variaveis.put("areasAfetadas", areas(resultado));
         variaveis.put("observacoesDoRefinamento", null);
         variaveis.put("aprovacoesEntreAreas", null);
+        variaveis.put("correcao", null);
+        variaveis.put("revisoesPorRefinamento", porRefinamento);
+        variaveis.put("limiteDeRevisoes", (rodadaDeRevisao == null ? 0 : rodadaDeRevisao) + porRefinamento);
         variaveis.put("custoUsd", somar(custo, resultado));
         return variaveis;
     }
@@ -97,8 +108,13 @@ public class EtapasDoFluxo {
         ResultadoDoAgente resultado = executar(Etapa.DESENVOLVIMENTO, diretorio, tarefa, "desenvolvimento-" + rodada,
                 Prompts.desenvolvimento(tarefa, rodada, correcao));
         Map<String, Object> variaveis = new HashMap<>();
+        boolean impedido = "impedido".equals(resultado.texto("status"));
         variaveis.put("rodadaDeDesenvolvimento", rodada);
+        variaveis.put("desenvolvimentoStatus", impedido ? "impedido" : "implementado");
         variaveis.put("desenvolvimentoBuild", resultado.texto("build"));
+        if (impedido) {
+            variaveis.put("observacoesDoRefinamento", "O desenvolvedor não conseguiu implementar o refinamento:\n" + resultado.texto("resumo"));
+        }
         variaveis.put("desenvolvimentoResumo", resultado.texto("resumo"));
         variaveis.put("commitAtual", workspaces.head(diretorio));
         variaveis.put("correcao", null);

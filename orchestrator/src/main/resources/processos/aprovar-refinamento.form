@@ -17,14 +17,14 @@
     },
     {
       "type": "checkbox",
-      "label": "Refinamento aprovado, pode desenvolver",
+      "label": "Refinamento aprovado. Com perguntas em aberto, o refinador adota as sugestões antes de seguir",
       "key": "refinamentoAprovado",
       "defaultValue": false,
       "id": "aprovar-refinamento-3"
     },
     {
       "type": "textarea",
-      "label": "Observações para o refinador (respostas às perguntas, ajustes)",
+      "label": "Respostas às perguntas e ajustes para o refinador",
       "key": "observacoesDoRefinamento",
       "conditional": {
         "hide": "=refinamentoAprovado = true"

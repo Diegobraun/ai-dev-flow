@@ -27,11 +27,27 @@
           "value": "seguir"
         },
         {
+          "label": "Voltar ao refinamento (o problema está no plano, não no código)",
+          "value": "refinar"
+        },
+        {
           "label": "Cancelar a tarefa",
           "value": "cancelar"
         }
       ],
       "id": "decidir-review-2"
+    },
+    {
+      "type": "textarea",
+      "label": "O que o refinador precisa decidir ou corrigir",
+      "key": "observacoesDoRefinamento",
+      "conditional": {
+        "hide": "=decisaoDoReview != \"refinar\""
+      },
+      "validate": {
+        "required": true
+      },
+      "id": "decidir-review-3"
     }
   ],
   "type": "default",

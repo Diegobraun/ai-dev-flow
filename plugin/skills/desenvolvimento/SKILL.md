@@ -48,6 +48,9 @@ build: ok | falhou
 
 ## Regras
 
+- Se o refinamento está `com-perguntas`, se contradiz o código ou se não dá para cumprir um critério sem uma
+  decisão que ninguém tomou, não implemente nada. Explique o que precisa ser decidido no `desenvolvimento.md` e
+  termine com `status: impedido`. Uma rodada sem código só gasta review.
 - Não mude nada fora do que o refinamento lista sem registrar em "Desvios do refinamento".
 - Não altere contrato (endpoint, evento, schema) de forma incompatível se o refinamento não disse que pode.
 - Não faça `git push`, não abra PR, não mexa em configuração de CI.

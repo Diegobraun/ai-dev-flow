@@ -148,6 +148,11 @@ tarefa andando enquanto os agentes trabalham.
   Os painéis gravam as mesmas variáveis dos formulários do BPMN (`refinamentoAprovado`, `decisaoDoReview`,
   `decisaoDosTestes`, `prAprovado`; `aprovado` e `motivo` na aprovação entre áreas). Uma tarefa humana sem
   painel próprio cai num painel genérico de aprovar ou rejeitar.
+- **O que está acontecendo**: um bloco no topo da tarefa diz em uma frase quem está com a bola: qual agente está
+  trabalhando e há quanto tempo, ou qual decisão espera por você e o que decidir.
+- **Perguntas do refinamento**: com `com-perguntas`, cada pergunta vira um campo de resposta, já preenchido com a
+  sugestão do refinador. As respostas voltam para o refinador; um refinamento com perguntas nunca vai direto
+  para o desenvolvimento.
 - **Pendências**: as tarefas humanas abertas, com filtro por grupo (o filtro fica salvo no navegador).
 - **Nova tarefa**: o mesmo formulário do início do processo, via `POST /tarefas`.
 
@@ -309,7 +314,9 @@ mvn -f orchestrator/pom.xml verify
 - `DevFlowProcessTest` sobe o Camunda com Testcontainers (Camunda Process Test) e roda o BPMN inteiro com o
   agente simulado: caminho feliz, refinamento devolvido com observações, review bloqueado até o limite, review
   corrigido na segunda rodada, testes falhando, falha do agente virando incidente e a aprovação entre áreas
-  (duas áreas aprovando, uma recusando e voltando para o refinamento, nenhuma área afetada).
+  (duas áreas aprovando, uma recusando e voltando para o refinamento, nenhuma área afetada), refinamento com
+  perguntas aprovado voltando para adotar as sugestões, desenvolvedor impedido voltando ao refinamento sem passar
+  pelo review e review esgotado voltando ao refinamento com novas rodadas.
 - `ClaudeCodeTest` confere as permissões montadas por etapa e roda um `claude` falso para testar a leitura da
   saída e os erros.
 

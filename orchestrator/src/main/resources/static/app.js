@@ -250,15 +250,16 @@ const VIEWS = {
     montar() {
       $('#conteudo').innerHTML = `
         <section id="topo" class="painel glass">${carregando()}</section>
+        <section id="proximo" class="proximo glass" hidden></section>
         <div class="detalhe" style="margin-top: 14px">
           <div class="principal">
+            <div id="acoes"></div>
             <section class="documentos glass">
               <nav id="abas" class="abas"></nav>
               <div id="documento" class="documento"></div>
             </section>
           </div>
           <aside class="lateral">
-            <div id="acoes"></div>
             <div id="areas"></div>
             <div id="incidentes"></div>
             <section id="resumos" class="painel glass resumos" hidden></section>
@@ -562,6 +563,7 @@ function desenharTarefa(detalhe) {
     ${desenharLinhaDoTempo(detalhe)}
     ${desenharTrilha(detalhe)}
     ${rodadas.length ? `<div class="linha-meta">rodadas: ${esc(rodadas.join(' · '))}</div>` : ''}`;
+  desenharProximo(detalhe);
   desenharAbas(detalhe);
   desenharAreas(detalhe);
   desenharIncidentes(detalhe);
@@ -695,12 +697,95 @@ function desenharIncidentes(detalhe) {
   }).join('');
 }
 
+const TRABALHO_DOS_AGENTES = {
+  'preparar-workspace': ['Preparando o workspace', 'Clonando o repositório e criando a branch da tarefa.'],
+  refinar: ['O refinador está trabalhando', 'Lendo o código, consultando o grafo de contratos e escrevendo o refinamento.'],
+  desenvolver: ['O desenvolvedor está trabalhando', 'Implementando o refinamento aprovado, rodando o build e fazendo commits.'],
+  revisar: ['O revisor está trabalhando', 'Comparando o diff com o refinamento, rodando o build e conferindo os contratos.'],
+  testar: ['O testador está trabalhando', 'Escrevendo e rodando os testes integrados de cada critério de aceite.'],
+  'abrir-pr': ['Abrindo o pull request', 'Montando o corpo do PR com o refinamento, o review e os testes.'],
+};
+
+const O_QUE_DECIDIR = {
+  'aprovar-refinamento': v => v.refinamentoStatus === 'com-perguntas'
+    ? `O refinador tem ${lista(v.refinamentoPerguntas).length} pergunta(s) e não segue para o desenvolvimento sem as respostas. Responda abaixo; as que têm sugestão já vêm preenchidas.`
+    : 'Leia o refinamento e aprove, ou peça um ajuste.',
+  'aprovar-entre-areas': v => `A mudança afeta a área ${esc(v.aprovacao?.area || '')}. O time dela aprova ou recusa.`,
+  'decidir-review': v => `O review bloqueou ${esc(v.rodadaDeRevisao ?? '')} vez(es). Decida se corrige de novo, volta ao refinamento, segue ou cancela.`,
+  'decidir-testes': () => 'Os testes integrados falharam. Decida se volta para o desenvolvimento ou cancela.',
+  'aprovar-pr': () => 'Tudo passou. Confira o resumo e abra o pull request.',
+};
+
+function desenharProximo(detalhe) {
+  const { resumo, variaveis, pendencias, incidentes, historico } = detalhe;
+  const alvo = $('#proximo');
+  let tipo;
+  let titulo;
+  let texto;
+  if (incidentes.length) {
+    const i = incidentes[0];
+    const passo = historico.find(p => p.elementId === i.elementId);
+    tipo = 'erro';
+    titulo = `Parou com erro em ${passo ? passo.nome : i.elementId}`;
+    texto = `${esc(i.mensagem || '')}<br><span class="muted">Depois de corrigir a causa, tente de novo pelo Operate (Incidents, Retry).</span>`;
+  } else if (pendencias.length) {
+    const nomes = pendencias.map(p => p.nome || NOMES_CURTOS[p.elementId] || p.elementId);
+    const explicar = O_QUE_DECIDIR[pendencias[0].elementId];
+    tipo = 'voce';
+    titulo = pendencias.length > 1 ? `Esperando ${pendencias.length} decisões: ${nomes.join(', ')}` : `Esperando você: ${nomes[0]}`;
+    texto = explicar ? explicar({ ...variaveis, ...(estado.pendencias.get(pendencias[0].userTaskKey)?.variaveis || {}) }) : 'Decida no painel abaixo.';
+  } else if (resumo.estado === 'concluida') {
+    tipo = 'ok';
+    titulo = 'Concluída';
+    texto = variaveis.prUrl ? `Pull request aberto: <a href="${esc(variaveis.prUrl)}" target="_blank" rel="noopener">${esc(variaveis.prUrl)}</a>` : 'O corpo do PR está pronto na aba Pull request e no workspace.';
+  } else if (resumo.estado === 'cancelada') {
+    tipo = 'neutro';
+    titulo = 'Cancelada';
+    texto = 'O fluxo foi encerrado sem pull request.';
+  } else {
+    const ativo = [...historico].reverse().find(p => p.estado === 'ACTIVE' && TRABALHO_DOS_AGENTES[p.elementId]);
+    const [nome, descricao] = ativo ? TRABALHO_DOS_AGENTES[ativo.elementId] : ['O fluxo está andando', 'Passando para a próxima etapa.'];
+    tipo = 'agente';
+    titulo = nome;
+    texto = `${esc(descricao)}${ativo?.inicio ? ` <span class="muted">Começou ${esc(relativo(ativo.inicio))}. Costuma levar de 1 a 3 minutos.</span>` : ''}`;
+  }
+  alvo.hidden = false;
+  alvo.className = `proximo glass ${tipo}`;
+  alvo.innerHTML = `<div class="icone"></div><div><h2>${esc(titulo)}</h2><p>${texto}</p></div>`;
+}
+
+const ROTULOS_DE_STATUS = {
+  pronto: 'pronto',
+  'com-perguntas': 'com perguntas',
+  ok: 'passou',
+  falhou: 'falhou',
+  'nao-executado': 'não rodou',
+  aprovado: 'aprovado',
+  bloqueado: 'bloqueado',
+  implementado: 'implementado',
+  impedido: 'impedido',
+};
+
+function rotuloDeStatus(valor) {
+  return ROTULOS_DE_STATUS[valor] || valor;
+}
+
+function sugestaoDa(pergunta) {
+  const achada = /\(sugest[aã]o:\s*([^)]*)\)/i.exec(pergunta);
+  return achada ? achada[1].trim() : '';
+}
+
+function semSugestao(pergunta) {
+  return pergunta.replace(/\s*\(sugest[aã]o:[^)]*\)\s*/i, ' ').replace(/^\(bloqueante\)\s*/i, '').trim();
+}
+
 function desenharResumos(detalhe) {
   const v = detalhe.variaveis;
   const linhas = [];
-  if (v.refinamentoStatus) linhas.push(['Refinamento', `<span class="badge ${v.refinamentoStatus === 'pronto' ? 'ok' : 'alerta'}">${esc(v.refinamentoStatus)}</span>`]);
-  if (v.desenvolvimentoBuild) linhas.push(['Build', `<span class="badge ${v.desenvolvimentoBuild === 'ok' ? 'ok' : 'erro'}">${esc(v.desenvolvimentoBuild)}</span>`]);
-  if (v.veredito) linhas.push(['Review', `<span class="badge ${v.veredito === 'aprovado' ? 'ok' : 'erro'}">${esc(v.veredito)}</span>${v.bloqueantes != null ? ` <span class="muted">${esc(v.bloqueantes)} bloqueante(s)</span>` : ''}`]);
+  if (v.refinamentoStatus) linhas.push(['Refinamento', `<span class="badge ${v.refinamentoStatus === 'pronto' ? 'ok' : 'alerta'}">${esc(rotuloDeStatus(v.refinamentoStatus))}</span>`]);
+  if (v.desenvolvimentoStatus === 'impedido') linhas.push(['Desenvolvimento', '<span class="badge alerta">impedido</span>']);
+  if (v.desenvolvimentoBuild) linhas.push(['Build', `<span class="badge ${v.desenvolvimentoBuild === 'ok' ? 'ok' : v.desenvolvimentoBuild === 'falhou' ? 'erro' : 'neutro'}">${esc(rotuloDeStatus(v.desenvolvimentoBuild))}</span>`]);
+  if (v.veredito) linhas.push(['Review', `<span class="badge ${v.veredito === 'aprovado' ? 'ok' : 'erro'}">${esc(rotuloDeStatus(v.veredito))}</span>${v.bloqueantes != null ? ` <span class="muted">${esc(v.bloqueantes)} bloqueante(s)</span>` : ''}`]);
   if (v.testesAprovados != null) linhas.push(['Testes', `<span class="badge ${v.testesAprovados ? 'ok' : 'erro'}">${v.testesAprovados ? 'passaram' : 'falharam'}</span>`]);
   if (v.prUrl) linhas.push(['PR', `<a href="${esc(v.prUrl)}" target="_blank" rel="noopener">${esc(v.prUrl.replace(/^https?:\/\//, ''))}</a>`]);
   if (v.branchBase) linhas.push(['Base', `<span class="mono">${esc(v.branchBase)}</span>`]);
@@ -758,6 +843,12 @@ function painelDeAcao(pendencia) {
       <span class="erro-campo" style="color:var(--error);font-size:12.5px"></span>
     </form>`;
   const form = $('form', secao);
+  $$('[data-so-com]', form).forEach(campo => {
+    const radios = $$('input[type=radio]', form);
+    const aplicar = () => { campo.hidden = !radios.some(r => r.checked && r.value === campo.dataset.soCom); };
+    radios.forEach(radio => radio.addEventListener('change', aplicar));
+    aplicar();
+  });
   $$('input[data-alterna]', form).forEach(alternador => {
     const alvo = $(alternador.dataset.alterna, form);
     const aplicar = () => { alvo.hidden = alternador.checked; };
@@ -824,27 +915,62 @@ function opcoes(nome, itens) {
 
 const PAINEIS = {
   'aprovar-refinamento'(p, v) {
-    const perguntas = lista(v.refinamentoPerguntas);
+    const perguntas = lista(v.refinamentoPerguntas).map(textoDe);
+    const comPerguntas = v.refinamentoStatus === 'com-perguntas' && perguntas.length;
+    const cabecalho = `
+      <div class="row" style="margin-bottom:8px">
+        ${v.refinamentoStatus ? `<span class="badge ${v.refinamentoStatus === 'pronto' ? 'ok' : 'alerta'}">${esc(rotuloDeStatus(v.refinamentoStatus))}</span>` : ''}
+        ${v.rodadaDeRefinamento ? `<span class="badge neutro">rodada ${esc(v.rodadaDeRefinamento)}</span>` : ''}
+        <span class="badge neutro">custo até aqui ${esc(dinheiro(v.custoUsd))}</span>
+      </div>
+      ${v.refinamentoResumo ? `<div class="markdown">${markdown(v.refinamentoResumo)}</div>` : ''}
+      <p class="muted" style="margin:8px 0 0">O documento completo está na aba Refinamento, logo abaixo.</p>`;
+    if (comPerguntas) {
+      return {
+        titulo: 'O refinador precisa de respostas',
+        corpo: cabecalho,
+        campos: `
+          <div class="perguntas">${perguntas.map((q, i) => `
+            <label class="pergunta ${/^\(bloqueante\)/i.test(q) ? 'bloqueante' : ''}">
+              <span class="enunciado"><b>${i + 1}.</b> ${esc(semSugestao(q))}${/^\(bloqueante\)/i.test(q) ? ' <span class="badge erro">bloqueia</span>' : ''}</span>
+              <textarea name="resposta-${i}" rows="2" placeholder="Sua resposta">${esc(sugestaoDa(q))}</textarea>
+              ${sugestaoDa(q) ? '<small class="muted">Preenchido com a sugestão do refinador. Edite se quiser outra coisa.</small>' : ''}
+            </label>`).join('')}
+          </div>
+          <label class="campo">Mais algum ajuste (opcional)
+            <textarea name="observacoesDoRefinamento" rows="2" placeholder="Ex.: manter a resposta antiga e criar GET /v2/loans"></textarea>
+          </label>`,
+        botoes: `
+          ${perguntas.every(sugestaoDa) ? '<button type="submit" class="ghost" value="sugestoes">Aceitar as sugestões e seguir</button>' : ''}
+          <button type="submit" class="sucesso" value="responder">Enviar respostas ao refinador</button>`,
+        coletar(form, decisao) {
+          if (decisao === 'sugestoes') return { refinamentoAprovado: true };
+          const respostas = perguntas.map((q, i) => {
+            const resposta = (form.elements[`resposta-${i}`].value || '').trim();
+            return resposta ? `${i + 1}. ${semSugestao(q)}\nResposta: ${resposta}` : null;
+          });
+          if (respostas.some((resposta, i) => !resposta && (/^\(bloqueante\)/i.test(perguntas[i]) || !sugestaoDa(perguntas[i])))) {
+            throw new Error('Responda as perguntas que bloqueiam e as que vieram sem sugestão');
+          }
+          const extra = (form.elements.observacoesDoRefinamento.value || '').trim();
+          const texto = [...respostas.filter(Boolean), extra ? `Ajuste: ${extra}` : null].filter(Boolean).join('\n\n');
+          if (!texto) throw new Error('Responda pelo menos uma pergunta');
+          return { refinamentoAprovado: false, observacoesDoRefinamento: texto };
+        },
+      };
+    }
     return {
       titulo: 'Aprovar refinamento',
-      corpo: `
-        <div class="row" style="margin-bottom:6px">
-          ${v.refinamentoStatus ? `<span class="badge ${v.refinamentoStatus === 'pronto' ? 'ok' : 'alerta'}">${esc(v.refinamentoStatus)}</span>` : ''}
-          ${v.rodadaDeRefinamento ? `<span class="badge neutro">rodada ${esc(v.rodadaDeRefinamento)}</span>` : ''}
-          <span class="badge neutro">custo até aqui ${esc(dinheiro(v.custoUsd))}</span>
-        </div>
-        ${v.refinamentoResumo ? `<div class="markdown">${markdown(v.refinamentoResumo)}</div>` : ''}
-        ${perguntas.length ? `<h3 style="margin-top:12px">Perguntas em aberto</h3><ol style="margin:0;padding-left:1.2em">${perguntas.map(q => `<li>${esc(textoDe(q))}</li>`).join('')}</ol>` : ''}`,
+      corpo: cabecalho,
       campos: `
-        <label class="opcao"><input type="checkbox" name="refinamentoAprovado" data-alterna=".observacoes">
-          <span><b>Refinamento aprovado, pode desenvolver</b><small>Desmarcado, volta para o refinador com as observações abaixo.</small></span>
-        </label>
-        <label class="campo observacoes">Observações para o refinador (respostas às perguntas, ajustes)
-          <textarea name="observacoesDoRefinamento" placeholder="Ex.: o limite é por faixa de risco, fuso America/Sao_Paulo"></textarea>
+        <label class="campo">Ajuste para o refinador (só se for pedir ajuste)
+          <textarea name="observacoesDoRefinamento" rows="2" placeholder="Ex.: o limite é por faixa de risco, fuso America/Sao_Paulo"></textarea>
         </label>`,
-      botoes: '<button type="submit" class="sucesso">Enviar decisão</button>',
-      coletar(form) {
-        if (form.elements.refinamentoAprovado.checked) return { refinamentoAprovado: true };
+      botoes: `
+        <button type="submit" class="ghost" value="ajustar">Pedir ajuste</button>
+        <button type="submit" class="sucesso" value="aprovar">Aprovar e seguir</button>`,
+      coletar(form, decisao) {
+        if (decisao === 'aprovar') return { refinamentoAprovado: true };
         return {
           refinamentoAprovado: false,
           observacoesDoRefinamento: textoObrigatorio(form, 'observacoesDoRefinamento', 'Escreva o que o refinador deve ajustar'),
@@ -859,13 +985,24 @@ const PAINEIS = {
       corpo: `
         <p style="margin:0 0 6px">${esc(v.rodadaDeRevisao ?? '?')} rodada(s) de review, <b>${esc(v.bloqueantes ?? '?')} bloqueante(s)</b> na última. Custo até aqui ${esc(dinheiro(v.custoUsd))}.</p>
         ${v.reviewResumo ? `<div class="markdown">${markdown(v.reviewResumo)}</div>` : ''}`,
-      campos: opcoes('decisaoDoReview', [
+      campos: `${opcoes('decisaoDoReview', [
         ['corrigir', 'Corrigir mais uma vez', 'O desenvolvedor recebe o último review e tenta de novo.'],
+        ['refinar', 'Voltar ao refinamento', 'O problema está no plano, não no código. O refinador recebe o que você escrever e o review recomeça do zero.'],
         ['seguir', 'Seguir para os testes mesmo assim', 'Os bloqueantes ficam registrados no PR.'],
         ['cancelar', 'Cancelar a tarefa', 'Encerra o fluxo sem PR.'],
-      ]),
+      ])}
+        <label class="campo" data-so-com="refinar" hidden>O que o refinador precisa decidir ou corrigir
+          <textarea name="observacoesDoRefinamento" rows="3" placeholder="Ex.: manter GET /loans como está e criar GET /v2/loans paginado"></textarea>
+        </label>`,
       botoes: '<button type="submit">Enviar decisão</button>',
-      coletar: form => ({ decisaoDoReview: escolhaObrigatoria(form, 'decisaoDoReview') }),
+      coletar(form) {
+        const decisao = escolhaObrigatoria(form, 'decisaoDoReview');
+        if (decisao !== 'refinar') return { decisaoDoReview: decisao };
+        return {
+          decisaoDoReview: decisao,
+          observacoesDoRefinamento: textoObrigatorio(form, 'observacoesDoRefinamento', 'Escreva o que o refinador deve mudar'),
+        };
+      },
     };
   },
 

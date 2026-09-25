@@ -119,6 +119,64 @@ class DevFlowProcessTest {
     }
 
     @Test
+    void refinamentoComPerguntasAprovadoVoltaAdotandoAsSugestoes() {
+        responder(Etapa.REFINAMENTO,
+                "{\"status\":\"com-perguntas\",\"resumo\":\"paginar\",\"perguntas\":[\"limite de size? (sugestão: 100)\"]}",
+                "{\"status\":\"pronto\",\"resumo\":\"paginar, size até 100\",\"perguntas\":[]}");
+        ProcessInstanceEvent instancia = iniciar();
+        contexto.completeUserTask("aprovar-refinamento", Map.of("refinamentoAprovado", true));
+
+        assertThat(instancia).hasActiveElements("aprovar-refinamento")
+                .hasCompletedElement("refinar", 2)
+                .hasNotActivatedElements("desenvolver")
+                .hasVariable("refinamentoStatus", "pronto");
+        assertThat(chamadas.get(1).prompt()).contains("adote a sua sugestão");
+
+        contexto.completeUserTask("aprovar-refinamento", Map.of("refinamentoAprovado", true));
+        assertThat(instancia).hasActiveElements("aprovar-pr");
+    }
+
+    @Test
+    void desenvolvedorImpedidoVoltaParaORefinamentoSemPassarPeloReview() {
+        responder(Etapa.DESENVOLVIMENTO,
+                "{\"status\":\"impedido\",\"build\":\"nao-executado\",\"resumo\":\"falta decidir a versão do endpoint\",\"commits\":0}",
+                "{\"status\":\"implementado\",\"build\":\"ok\",\"resumo\":\"2 arquivos\",\"commits\":1}");
+        ProcessInstanceEvent instancia = iniciar();
+        contexto.completeUserTask("aprovar-refinamento", Map.of("refinamentoAprovado", true));
+
+        assertThat(instancia).hasActiveElements("aprovar-refinamento")
+                .hasCompletedElement("refinar", 2)
+                .hasNotActivatedElements("revisar")
+                .hasVariable("desenvolvimentoStatus", "impedido");
+        assertThat(chamadas.get(2).prompt()).contains("falta decidir a versão do endpoint");
+
+        contexto.completeUserTask("aprovar-refinamento", Map.of("refinamentoAprovado", true));
+        assertThat(instancia).hasActiveElements("aprovar-pr").hasCompletedElement("revisar", 1);
+    }
+
+    @Test
+    void reviewEsgotadoPodeVoltarAoRefinamentoComNovasRodadas() {
+        responder(Etapa.REVISAO, "{\"veredito\":\"bloqueado\",\"bloqueantes\":1,\"importantes\":0,\"resumo\":\"B1 plano\"}");
+        ProcessInstanceEvent instancia = iniciar();
+        contexto.completeUserTask("aprovar-refinamento", Map.of("refinamentoAprovado", true));
+        assertThat(instancia).hasActiveElements("decidir-review");
+
+        contexto.completeUserTask("decidir-review",
+                Map.of("decisaoDoReview", "refinar", "observacoesDoRefinamento", "usar GET /v2/loans"));
+
+        assertThat(instancia).hasActiveElements("aprovar-refinamento")
+                .hasVariable("limiteDeRevisoes", 6)
+                .hasVariable("correcao", null);
+        assertThat(chamadas.stream().filter(c -> c.etapa() == Etapa.REFINAMENTO).toList().get(1).prompt())
+                .contains("usar GET /v2/loans");
+
+        contexto.completeUserTask("aprovar-refinamento", Map.of("refinamentoAprovado", true));
+        assertThat(instancia).hasActiveElements("decidir-review").hasVariable("rodadaDeRevisao", 6);
+        List<String> desenvolvimentos = chamadas.stream().filter(c -> c.etapa() == Etapa.DESENVOLVIMENTO).map(ChamadaDoAgente::prompt).toList();
+        assertThat(desenvolvimentos.get(3)).contains("Implemente o refinamento");
+    }
+
+    @Test
     void mudancaQueAfetaOutrasAreasEsperaAAprovacaoDeCadaUma() {
         responder(Etapa.REFINAMENTO, refinamentoAfetando("credito", "pagamentos"));
         ProcessInstanceEvent instancia = iniciar();

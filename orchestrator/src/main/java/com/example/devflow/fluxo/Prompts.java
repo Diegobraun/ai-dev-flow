@@ -7,7 +7,8 @@ final class Prompts {
     private Prompts() {
     }
 
-    static String refinamento(String tarefa, String descricao, String observacoes, List<String> recusas) {
+    static String refinamento(String tarefa, String descricao, String observacoes, List<String> recusas,
+                              boolean aceitarSugestoes) {
         String prompt = """
                 Tarefa: %s
                 Pasta de trabalho: .devflow/%s/
@@ -23,6 +24,14 @@ final class Prompts {
 
                     Ajuste o refinamento.md para responder a essas observações.
                     """.formatted(observacoes);
+        }
+        if (aceitarSugestoes) {
+            prompt += """
+
+                    O time aprovou o refinamento.md atual, mas ele ainda tem perguntas em aberto. Para cada pergunta sem
+                    resposta, adote a sua sugestão, registre a decisão no documento e tire a pergunta da lista. Só
+                    continue com status com-perguntas se alguma pergunta não tiver sugestão possível.
+                    """;
         }
         if (!recusas.isEmpty()) {
             prompt += """
