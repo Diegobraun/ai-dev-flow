@@ -1,0 +1,32 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  orchestrator:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: maven
+      - run: mvn -B -f orchestrator/pom.xml verify
+
+  plugin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Manifestos e frontmatter
+        run: |
+          python3 -m json.tool .claude-plugin/marketplace.json > /dev/null
+          python3 -m json.tool plugin/.claude-plugin/plugin.json > /dev/null
+          for f in plugin/agents/*.md plugin/skills/*/SKILL.md; do
+            head -1 "$f" | grep -qx -- '---' || { echo "$f sem frontmatter"; exit 1; }
+            grep -q '^name: ' "$f" || { echo "$f sem name"; exit 1; }
+            grep -q '^description: ' "$f" || { echo "$f sem description"; exit 1; }
+          done
