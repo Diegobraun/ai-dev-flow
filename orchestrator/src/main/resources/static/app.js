@@ -52,6 +52,7 @@ const estado = {
   documentoExibido: null,
   assinaturaDasAcoes: null,
   pendencias: new Map(),
+  configuracao: { abrirPullRequest: false },
 };
 
 const $ = (seletor, raiz = document) => raiz.querySelector(seletor);
@@ -736,8 +737,10 @@ function desenharProximo(detalhe) {
     texto = explicar ? explicar({ ...variaveis, ...(estado.pendencias.get(pendencias[0].userTaskKey)?.variaveis || {}) }) : 'Decida no painel abaixo.';
   } else if (resumo.estado === 'concluida') {
     tipo = 'ok';
-    titulo = 'Concluída';
-    texto = variaveis.prUrl ? `Pull request aberto: <a href="${esc(variaveis.prUrl)}" target="_blank" rel="noopener">${esc(variaveis.prUrl)}</a>` : 'O corpo do PR está pronto na aba Pull request e no workspace.';
+    titulo = variaveis.prUrl ? 'Concluída, PR aberto' : 'Concluída, PR só local';
+    texto = variaveis.prUrl
+      ? `<a href="${esc(variaveis.prUrl)}" target="_blank" rel="noopener">${esc(variaveis.prUrl)}</a>`
+      : `Nada foi para o GitHub. O corpo do PR está em <code>${esc(variaveis.prCorpo || 'workspaces/' + resumo.tarefa)}</code> e o código na branch <code>${esc(variaveis.branch || '')}</code> do workspace.`;
   } else if (resumo.estado === 'cancelada') {
     tipo = 'neutro';
     titulo = 'Cancelada';
@@ -1028,14 +1031,17 @@ const PAINEIS = {
     const resumos = [['Desenvolvimento', v.desenvolvimentoResumo], ['Review', v.reviewResumo], ['Testes', v.testesResumo]]
       .filter(([, texto]) => texto);
     return {
-      titulo: 'Pronto para o pull request',
+      titulo: estado.configuracao.abrirPullRequest ? 'Pronto para o pull request' : 'Pronto para gerar o PR (local)',
       corpo: `
         <p style="margin:0 0 6px">Branch <code>${esc(v.branch || '?')}</code> · ${esc(v.rodadaDeRevisao ?? 0)} rodada(s) de review · custo total ${esc(dinheiro(v.custoUsd))}</p>
-        ${resumos.map(([rotulo, texto]) => `<p style="margin:6px 0"><b>${esc(rotulo)}:</b> ${esc(texto)}</p>`).join('')}`,
+        ${resumos.map(([rotulo, texto]) => `<p style="margin:6px 0"><b>${esc(rotulo)}:</b> ${esc(texto)}</p>`).join('')}
+        <p class="muted" style="margin:8px 0 0">${estado.configuracao.abrirPullRequest
+          ? `Aprovar faz push da branch e abre o PR no repositório, com base <code>${esc(v.branchBase || '')}</code>.`
+          : 'O orquestrador está com DEVFLOW_ABRIR_PR=false: aprovar só grava o pr.md no workspace, nada vai para o GitHub.'}</p>`,
       campos: '',
       botoes: `
         <button type="submit" class="ghost" value="recusar">Não abrir</button>
-        <button type="submit" class="sucesso" value="aprovar">Abrir o pull request</button>`,
+        <button type="submit" class="sucesso" value="aprovar">${estado.configuracao.abrirPullRequest ? 'Abrir o pull request' : 'Gerar o PR local'}</button>`,
       coletar: (form, decisao) => ({ prAprovado: decisao === 'aprovar' }),
     };
   },
@@ -1171,4 +1177,4 @@ document.addEventListener('visibilitychange', () => {
   $('#ao-vivo').classList.toggle('pausado', document.hidden);
 });
 window.addEventListener('hashchange', navegar);
-navegar();
+api('/api/configuracao').then(c => { estado.configuracao = c; }).catch(() => {}).finally(navegar);

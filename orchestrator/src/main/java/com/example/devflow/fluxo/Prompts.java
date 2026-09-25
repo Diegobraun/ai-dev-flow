@@ -19,7 +19,8 @@ final class Prompts {
         if (observacoes != null && !observacoes.isBlank()) {
             prompt += """
 
-                    Esta é uma nova rodada. O refinamento.md atual não foi aprovado. Observações de quem revisou:
+                    Esta é uma nova rodada. Leia o refinamento.md atual com Read antes de alterá-lo.
+                    Observações de quem revisou:
                     %s
 
                     Ajuste o refinamento.md para responder a essas observações.
@@ -28,7 +29,7 @@ final class Prompts {
         if (aceitarSugestoes) {
             prompt += """
 
-                    O time aprovou o refinamento.md atual, mas ele ainda tem perguntas em aberto. Para cada pergunta sem
+                    O time aprovou o refinamento.md atual (leia com Read antes de alterar), mas ele ainda tem perguntas em aberto. Para cada pergunta sem
                     resposta, adote a sua sugestão, registre a decisão no documento e tire a pergunta da lista. Só
                     continue com status com-perguntas se alguma pergunta não tiver sugestão possível.
                     """;
@@ -36,7 +37,7 @@ final class Prompts {
         if (!recusas.isEmpty()) {
             prompt += """
 
-                    Áreas afetadas recusaram o refinamento. Motivos:
+                    Áreas afetadas recusaram o refinamento (leia o refinamento.md com Read antes de alterar). Motivos:
                     %s
 
                     Ajuste o refinamento.md para responder a cada área, de preferência mantendo a mudança compatível
