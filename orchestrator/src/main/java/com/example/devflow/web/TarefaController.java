@@ -41,7 +41,9 @@ public class TarefaController {
                         "descricao", pedido.descricao(),
                         "repositorio", pedido.repositorio(),
                         "branchBase", branchBase,
-                        "limiteDeRevisoes", properties.limiteDeRevisoes()))
+                        "limiteDeRevisoes", pedido.limiteDeRevisoes() != null
+                                ? pedido.limiteDeRevisoes()
+                                : properties.limiteDeRevisoes()))
                 .send()
                 .join();
         return Map.of("tarefa", tarefa, "processInstanceKey", String.valueOf(instancia.getProcessInstanceKey()));

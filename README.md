@@ -127,15 +127,41 @@ DEVFLOW_WORKSPACES=$PWD/workspaces DEVFLOW_PLUGIN=$PWD/plugin \
   java -jar orchestrator/target/devflow-orchestrator-0.1.0-SNAPSHOT.jar
 ```
 
+- Interface do devflow: http://localhost:8070/
 - Operate: http://localhost:8180/operate (demo / demo)
 - Tasklist: http://localhost:8180/tasklist (demo / demo)
-- Orquestrador: http://localhost:8070
 
 As portas do Camunda (8180, 26600, 9210) não são as padrão para não conflitar com outro Camunda local.
 
+### Interface
+
+O orquestrador serve uma interface própria em http://localhost:8070/, que substitui o Tasklist e o Operate no
+dia a dia. Ela lê o Camunda pela REST API v2 e se atualiza sozinha a cada poucos segundos, então dá para ver a
+tarefa andando enquanto os agentes trabalham.
+
+- **Quadro**: uma coluna por etapa (refinamento, aprovação, desenvolvimento, review, teste, PR, encerradas). O
+  cartão mostra repositório, custo, rodada e se a tarefa espera por alguém ou tem incidente.
+- **Tarefa**: linha do tempo das etapas com as voltas numeradas, os documentos de cada etapa renderizados
+  (refinamento, review, testes, corpo do PR), histórico, variáveis, incidentes e o painel da decisão em aberto.
+  Os painéis gravam as mesmas variáveis dos formulários do BPMN (`refinamentoAprovado`, `decisaoDoReview`,
+  `decisaoDosTestes`, `prAprovado`; `aprovado` e `motivo` na aprovação entre áreas). Uma tarefa humana sem
+  painel próprio cai num painel genérico de aprovar ou rejeitar.
+- **Pendências**: as tarefas humanas abertas, com filtro por grupo (o filtro fica salvo no navegador).
+- **Nova tarefa**: o mesmo formulário do início do processo, via `POST /tarefas`.
+
+A API que a interface usa fica em `/api`: `GET /api/tarefas`, `GET /api/tarefas/{processInstanceKey}`,
+`GET /api/pendencias?grupo=`, `GET /api/pendencias/{userTaskKey}`, `POST /api/pendencias/{userTaskKey}/conclusao`
+e `GET /api/grupos`. Não há autenticação: é para rodar na máquina de quem opera o fluxo.
+
+![Quadro](docs/img/interface-quadro.jpg)
+
+![Tarefa concluída: linha do tempo, voltas e corpo do PR](docs/img/interface-tarefa.jpg)
+
+![Aprovação entre áreas](docs/img/interface-areas.jpg)
+
 ### Rodar uma tarefa
 
-Pelo Tasklist: aba **Processes**, "Fluxo de desenvolvimento com agentes", **Start process**. O formulário pede
+Pela interface: **Nova tarefa**. Pelo Tasklist: aba **Processes**, "Fluxo de desenvolvimento com agentes", **Start process**. O formulário pede
 identificador, descrição, repositório, branch base e o limite de rodadas de review.
 
 Pelo terminal:
