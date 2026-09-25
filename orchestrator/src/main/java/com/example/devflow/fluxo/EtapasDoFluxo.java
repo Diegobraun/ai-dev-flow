@@ -179,8 +179,9 @@ public class EtapasDoFluxo {
                                                 @Variable(name = "rodadaDeRevisao") int rodadas,
                                                 @Variable(name = "custoUsd") double custo) {
         Path diretorio = Path.of(workspace);
+        String refinamento = workspaces.documento(diretorio, tarefa, "refinamento.md");
         String corpo = PullRequest.corpo(descricao,
-                workspaces.documento(diretorio, tarefa, "refinamento.md"),
+                refinamento,
                 workspaces.documento(diretorio, tarefa, "review-" + rodadas + ".md"),
                 workspaces.documento(diretorio, tarefa, "testes.md"),
                 rodadas, custo);
@@ -188,7 +189,7 @@ public class EtapasDoFluxo {
         String url = "";
         if (properties.abrirPullRequest()) {
             url = workspaces.abrirPullRequest(new Workspace(diretorio, branch, commitBase), branchBase,
-                    PullRequest.titulo(tarefa, descricao), arquivo);
+                    PullRequest.titulo(tarefa, descricao, refinamento), arquivo);
         }
         return Map.of("prUrl", url, "prCorpo", arquivo.toString(),
                 "commits", workspaces.commitsDesde(diretorio, commitBase));

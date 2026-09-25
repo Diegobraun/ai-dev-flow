@@ -7,9 +7,21 @@ final class PullRequest {
     private PullRequest() {
     }
 
-    static String titulo(String tarefa, String descricao) {
-        String primeiraLinha = descricao.lines().findFirst().orElse(tarefa).strip();
-        return primeiraLinha.length() > 72 ? primeiraLinha.substring(0, 69) + "..." : primeiraLinha;
+    static String titulo(String tarefa, String descricao, String refinamento) {
+        String doRefinamento = semCabecalho(refinamento == null ? "" : refinamento).lines()
+                .filter(linha -> linha.startsWith("# "))
+                .map(linha -> linha.substring(2).strip())
+                .filter(linha -> !linha.isEmpty())
+                .findFirst()
+                .orElse(null);
+        if (doRefinamento != null) {
+            return cortar(doRefinamento, 120);
+        }
+        return cortar(descricao.lines().findFirst().orElse(tarefa).strip(), 72);
+    }
+
+    private static String cortar(String texto, int limite) {
+        return texto.length() > limite ? texto.substring(0, limite - 3) + "..." : texto;
     }
 
     static String corpo(String descricao, String refinamento, String review, String testes, int rodadas, double custo) {
