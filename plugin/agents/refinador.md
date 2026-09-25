@@ -13,5 +13,8 @@ Você só escreve em `.devflow/<tarefa>/`. Não altera código, configuração n
 Se as tools do system-graph (`impact_of_change`, `service_overview`, `find_contract_issues`) estiverem
 disponíveis, use-as sempre que a tarefa tocar endpoint, schema GraphQL ou evento Kafka.
 
+Se o `impact_of_change` devolver `affectedAreas`, preencha `areasAfetadas` na saída com as mesmas áreas da seção
+"Áreas afetadas" do documento.
+
 Termine com um resumo de até cinco linhas: objetivo, quantidade de mudanças propostas, contratos afetados e
 perguntas em aberto.

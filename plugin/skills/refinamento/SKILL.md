@@ -28,6 +28,9 @@ redescobrir o código. Nada de código de produção é alterado aqui.
      consulte quem consome o contrato e registre serviço, arquivo e linha.
    - Sem elas, procure consumidores no próprio repositório e escreva explicitamente "consumidores externos não
      verificados".
+   - Se a resposta do `impact_of_change` trouxer `affectedAreas`, a mudança atinge outras áreas de negócio. Liste
+     cada área, os times e os serviços em "Áreas afetadas". Cada uma vai precisar aprovar antes do
+     desenvolvimento, então diga o que muda do lado delas em uma linha.
 5. **Defina critérios de aceite testáveis.** No formato Dado / Quando / Então, cada um verificável por um teste
    automatizado. Inclua pelo menos um caso de erro.
 6. **Planeje os testes.** Para cada critério, diga que tipo de teste cobre (unitário, integração com
@@ -42,4 +45,5 @@ redescobrir o código. Nada de código de produção é alterado aqui.
   pedido nem no código viram pergunta.
 - `status: com-perguntas` quando houver pergunta que impede começar. Pergunta que só refina um detalhe pode ficar
   com uma sugestão de resposta e `status: pronto`.
+- Área afetada é sempre de outra área. Consumidor da própria área fica só em "Contratos afetados".
 - Seja curto. O documento é lido por quem aprova e por quem implementa, não é relatório.

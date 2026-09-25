@@ -47,6 +47,19 @@ class ClaudeCodeTest {
     }
 
     @Test
+    void usaOMcpDoRepositorioQuandoNaoHaConfiguracao() throws IOException {
+        Path workspace = Files.createDirectories(temp.resolve("repo"));
+        Files.writeString(workspace.resolve(".mcp.json"), "{\"mcpServers\":{}}");
+
+        assertThat(claude("claude", "", Map.of()).comando(Etapa.REFINAMENTO, workspace))
+                .containsSubsequence("--mcp-config", workspace.resolve(".mcp.json").toString());
+        assertThat(claude("claude", "mcp.json", Map.of()).comando(Etapa.REFINAMENTO, workspace))
+                .containsSubsequence("--mcp-config", temp.resolve("mcp.json").toString());
+        assertThat(claude("claude", "", Map.of()).comando(Etapa.REFINAMENTO, temp.resolve("sem-mcp")))
+                .doesNotContain("--mcp-config");
+    }
+
+    @Test
     void testadorSoEditaTestes() {
         List<String> comando = claude("claude", "", Map.of()).comando(Etapa.TESTE);
 

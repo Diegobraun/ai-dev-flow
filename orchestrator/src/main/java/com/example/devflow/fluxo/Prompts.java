@@ -1,11 +1,13 @@
 package com.example.devflow.fluxo;
 
+import java.util.List;
+
 final class Prompts {
 
     private Prompts() {
     }
 
-    static String refinamento(String tarefa, String descricao, String observacoes) {
+    static String refinamento(String tarefa, String descricao, String observacoes, List<String> recusas) {
         String prompt = """
                 Tarefa: %s
                 Pasta de trabalho: .devflow/%s/
@@ -21,6 +23,16 @@ final class Prompts {
 
                     Ajuste o refinamento.md para responder a essas observações.
                     """.formatted(observacoes);
+        }
+        if (!recusas.isEmpty()) {
+            prompt += """
+
+                    Áreas afetadas recusaram o refinamento. Motivos:
+                    %s
+
+                    Ajuste o refinamento.md para responder a cada área, de preferência mantendo a mudança compatível
+                    com o que elas usam hoje.
+                    """.formatted(String.join("\n", recusas.stream().map(r -> "- " + r).toList()));
         }
         return prompt;
     }
@@ -40,15 +52,18 @@ final class Prompts {
                 """.formatted(tarefa, correcao);
     }
 
-    static String revisao(String tarefa, String commitBase, int rodada) {
+    static String revisao(String tarefa, String commitBase, int rodada, List<String> areasAprovadas) {
+        String aprovadas = areasAprovadas.isEmpty() ? "nenhuma" : String.join(", ", areasAprovadas);
         return """
                 Tarefa: %s
                 Commit base: %s
                 Rodada: %d
                 Pasta de trabalho: .devflow/%s/
 
+                Áreas que aprovaram a mudança: %s
+
                 Revise o diff %s...HEAD contra o refinamento.md e escreva review-%d.md.
-                """.formatted(tarefa, commitBase, rodada, tarefa, commitBase, rodada);
+                """.formatted(tarefa, commitBase, rodada, tarefa, aprovadas, commitBase, rodada);
     }
 
     static String teste(String tarefa) {

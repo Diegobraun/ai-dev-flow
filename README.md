@@ -7,7 +7,9 @@ flowchart LR
     T["tarefa"] --> R["refinador<br/>refinamento técnico"]
     R --> A1{{"humano aprova<br/>o refinamento"}}
     A1 -- ajustar --> R
-    A1 -- ok --> D["desenvolvedor<br/>código + build"]
+    A1 -- ok --> AR{{"cada área afetada<br/>aprova a mudança"}}
+    AR -- recusou --> R
+    AR -- "todas ok" --> D["desenvolvedor<br/>código + build"]
     D --> V["revisor<br/>code review"]
     V -- "bloqueado<br/>(até 3 rodadas)" --> D
     V -- aprovado --> Q["testador<br/>testes integrados"]
@@ -58,7 +60,7 @@ plugin/
 orchestrator/                     Spring Boot + Camunda 8.8: BPMN, formulários, job workers
 docker-compose.yml                Camunda 8.8 (Zeebe, Operate, Tasklist) + Elasticsearch
 scripts/devflow.sh                iniciar tarefa, listar e concluir tarefas humanas
-mcp/system-graph.json             MCP do system-graph para refinador e revisor
+mcp/system-graph.json             MCP do hub do system-graph, para forçar um MCP único
 docs/exemplo/                     documentos gerados numa execução real
 ```
 
@@ -194,7 +196,7 @@ só como texto.
 |---|---|---|
 | `DEVFLOW_WORKSPACES` | `./workspaces` | onde os repositórios são clonados |
 | `DEVFLOW_PLUGIN` | `../plugin` | pasta do plugin |
-| `DEVFLOW_MCP_CONFIG` | vazio | ex.: `mcp/system-graph.json` |
+| `DEVFLOW_MCP_CONFIG` | vazio | MCP para todas as etapas. Vazio: o `.mcp.json` do repositório, se houver |
 | `DEVFLOW_MODELO_<AGENTE>` | modelo padrão da conta | ex.: `DEVFLOW_MODELO_TESTADOR=sonnet` |
 | `DEVFLOW_ABRIR_PR` | `false` | faz push e abre o PR no fim |
 | `devflow.limite-de-revisoes` | `3` | rodadas de review antes de chamar um humano |
@@ -203,11 +205,34 @@ só como texto.
 
 ### Com o system-graph
 
-Com o [system-graph](https://github.com/Diegobraun/system-graph-poc) de pé, `DEVFLOW_MCP_CONFIG=mcp/system-graph.json`
-dá ao refinador e ao revisor as tools `impact_of_change`, `service_overview` e `find_contract_issues`. O
-refinamento passa a listar quem consome cada contrato alterado, com arquivo e linha, e o revisor bloqueia se o
-diff afeta um consumidor que o refinamento não previu. Sem ele, os dois escrevem "consumidores externos não
-verificados".
+Com o [system-graph](https://github.com/Diegobraun/system-graph-poc) de pé, o refinador e o revisor ganham as
+tools `impact_of_change`, `service_overview` e `find_contract_issues`. O MCP usado é o do `.mcp.json` do
+repositório clonado, que aponta para o grafo da área do serviço ([grafo por área](https://github.com/Diegobraun/system-graph-poc/blob/areas/docs/areas.md)).
+`DEVFLOW_MCP_CONFIG` força um MCP único para tudo, como o `mcp/system-graph.json` do hub.
+
+O refinamento passa a listar quem consome cada contrato alterado, com arquivo e linha, e as **áreas afetadas**
+(`affectedAreas` do `impact_of_change`). Quando alguma outra área é afetada, o processo abre uma tarefa
+"Aprovação entre áreas" para cada uma, em paralelo, com `candidateGroups` igual ao nome da área:
+
+```mermaid
+flowchart LR
+    R["refinador"] --> A{{"seu time aprova"}}
+    A --> G{"afeta outras<br/>áreas?"}
+    G -- não --> D["desenvolvedor"]
+    G -- sim --> M["Aprovação entre áreas<br/>uma por área, em paralelo"]
+    M --> T{"todas<br/>aprovaram?"}
+    T -- sim --> D
+    T -- "não" --> R
+```
+
+- A área vê o contrato que muda, os serviços e o `arquivo:linha` do lado dela, e aprova ou recusa com motivo.
+- Uma recusa devolve o refinamento com o motivo de cada área no prompt. O refinamento volta a passar pelo seu time
+  e, se ainda afetar outras áreas, por elas de novo.
+- O revisor recebe a lista de áreas que aprovaram e roda o `impact_of_change` no diff. Área afetada que não
+  aprovou é bloqueante: a mudança cresceu depois da aprovação.
+
+Sem o system-graph, os dois escrevem "consumidores externos não verificados" e o fluxo segue sem aprovação entre
+áreas.
 
 ## Exemplo real
 
@@ -235,7 +260,8 @@ mvn -f orchestrator/pom.xml verify
 
 - `DevFlowProcessTest` sobe o Camunda com Testcontainers (Camunda Process Test) e roda o BPMN inteiro com o
   agente simulado: caminho feliz, refinamento devolvido com observações, review bloqueado até o limite, review
-  corrigido na segunda rodada, testes falhando e falha do agente virando incidente.
+  corrigido na segunda rodada, testes falhando, falha do agente virando incidente e a aprovação entre áreas
+  (duas áreas aprovando, uma recusando e voltando para o refinamento, nenhuma área afetada).
 - `ClaudeCodeTest` confere as permissões montadas por etapa e roda um `claude` falso para testar a leitura da
   saída e os erros.
 

@@ -14,6 +14,7 @@ escreveu. Julgue o que está no diff contra o que foi combinado no refinamento.
 - `.devflow/<tarefa>/refinamento.md`, se existir. Sem refinamento, revise só pelo checklist e diga isso no
   documento.
 - Número da rodada (`<n>`). Se não vier, use o próximo número livre de `review-<n>.md`.
+- Áreas que aprovaram a mudança, se vierem no pedido. São as da seção "Áreas afetadas" do refinamento.
 
 ## Procedimento
 
@@ -24,7 +25,8 @@ escreveu. Julgue o que está no diff contra o que foi combinado no refinamento.
 4. Aplique o [checklist](checklist.md).
 5. Se a mudança toca contrato e as tools do system-graph estiverem disponíveis, rode `impact_of_change` e
    compare com a seção "Contratos afetados" do refinamento. Consumidor que o refinamento não previu é
-   bloqueante.
+   bloqueante. Se a resposta trouxer `affectedAreas`, toda área listada precisa estar entre as que aprovaram:
+   área que não aprovou é bloqueante, com o contrato e o serviço dela no apontamento.
 6. Confira se cada critério de aceite tem implementação. Critério sem implementação é bloqueante.
 7. Rode o build com testes (`./mvnw -q verify`, `mvn -q verify` ou `./gradlew check`). Build ou teste quebrado é
    bloqueante. Não conserte nada: só registre.

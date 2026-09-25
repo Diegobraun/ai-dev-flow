@@ -32,6 +32,14 @@ Uma ou duas frases: o que muda para quem usa o sistema.
 Escreva "nenhum" se a mudança não altera contrato. Escreva "consumidores externos não verificados" se não foi
 possível consultar.
 
+## Áreas afetadas
+
+| Área | Times | Serviços | O que muda para eles |
+|---|---|---|---|
+| credito | Crédito | loan-service | passa a receber `monthlyIncome` em `account-opened`; campo novo, compatível |
+
+Escreva "nenhuma" se só a própria área é afetada. Cada área listada aprova o refinamento antes do desenvolvimento.
+
 ## Critérios de aceite
 
 1. **Dado** ..., **quando** ..., **então** ...

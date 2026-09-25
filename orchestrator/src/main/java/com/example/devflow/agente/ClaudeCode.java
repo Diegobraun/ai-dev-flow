@@ -32,7 +32,7 @@ public class ClaudeCode implements Agente {
 
     @Override
     public ResultadoDoAgente executar(ChamadaDoAgente chamada) {
-        List<String> comando = comando(chamada.etapa());
+        List<String> comando = comando(chamada.etapa(), chamada.workspace());
         Path prompt = arquivo(chamada.log(), ".prompt.md");
         Path saida = arquivo(chamada.log(), ".json");
         Path erros = arquivo(chamada.log(), ".err");
@@ -62,6 +62,10 @@ public class ClaudeCode implements Agente {
     }
 
     List<String> comando(Etapa etapa) {
+        return comando(etapa, null);
+    }
+
+    List<String> comando(Etapa etapa, Path workspace) {
         Path plugin = properties.plugin().toAbsolutePath().normalize();
         List<String> comando = new ArrayList<>(List.of(
                 properties.claude(), "-p",
@@ -74,8 +78,9 @@ public class ClaudeCode implements Agente {
                 "--strict-mcp-config",
                 "--no-session-persistence",
                 "--max-budget-usd", properties.orcamentoPorEtapaUsd().toPlainString()));
-        if (properties.mcpConfig() != null && !properties.mcpConfig().isBlank()) {
-            comando.addAll(List.of("--mcp-config", Path.of(properties.mcpConfig()).toAbsolutePath().toString()));
+        Path mcp = mcpConfig(workspace);
+        if (mcp != null) {
+            comando.addAll(List.of("--mcp-config", mcp.toAbsolutePath().toString()));
         }
         String modelo = properties.modelo(etapa.agente());
         if (modelo != null && !modelo.isBlank()) {
@@ -105,6 +110,16 @@ public class ClaudeCode implements Agente {
             throw new AgenteFalhou(etapa.agente() + " não devolveu a saída estruturada: " + resumo(resultado.path("result").asText()));
         }
         return new ResultadoDoAgente(estruturado, resultado.path("total_cost_usd").asDouble(0), resultado.path("num_turns").asInt(0), duracao);
+    }
+
+    private Path mcpConfig(Path workspace) {
+        if (properties.mcpConfig() != null && !properties.mcpConfig().isBlank()) {
+            return Path.of(properties.mcpConfig());
+        }
+        if (workspace != null && Files.isRegularFile(workspace.resolve(".mcp.json"))) {
+            return workspace.resolve(".mcp.json");
+        }
+        return null;
     }
 
     private String schema(Etapa etapa) {

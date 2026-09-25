@@ -42,6 +42,7 @@
       </bpmn:extensionElements>
       <bpmn:incoming>f-preparado</bpmn:incoming>
       <bpmn:incoming>f-refinamento-ajustar</bpmn:incoming>
+      <bpmn:incoming>f-areas-recusaram</bpmn:incoming>
       <bpmn:outgoing>f-refinado</bpmn:outgoing>
     </bpmn:serviceTask>
 
@@ -60,11 +61,45 @@
       <bpmn:outgoing>f-refinamento-ajustar</bpmn:outgoing>
     </bpmn:exclusiveGateway>
 
+    <bpmn:exclusiveGateway id="outras-areas" name="Afeta outras áreas?" default="f-sem-outras-areas">
+      <bpmn:incoming>f-refinamento-ok</bpmn:incoming>
+      <bpmn:outgoing>f-com-outras-areas</bpmn:outgoing>
+      <bpmn:outgoing>f-sem-outras-areas</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:userTask id="aprovar-entre-areas" name="Aprovação entre áreas">
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition formId="aprovar-entre-areas" />
+        <zeebe:assignmentDefinition candidateGroups="=[aprovacao.area]" />
+        <zeebe:ioMapping>
+          <zeebe:input source="=false" target="aprovado" />
+          <zeebe:input source="=null" target="motivo" />
+        </zeebe:ioMapping>
+      </bpmn:extensionElements>
+      <bpmn:incoming>f-com-outras-areas</bpmn:incoming>
+      <bpmn:outgoing>f-areas-avaliaram</bpmn:outgoing>
+      <bpmn:multiInstanceLoopCharacteristics>
+        <bpmn:extensionElements>
+          <zeebe:loopCharacteristics inputCollection="=areasAfetadas" inputElement="aprovacao"
+                                     outputCollection="aprovacoesEntreAreas"
+                                     outputElement="={area: aprovacao.area, aprovado: aprovado, motivo: motivo}" />
+        </bpmn:extensionElements>
+      </bpmn:multiInstanceLoopCharacteristics>
+    </bpmn:userTask>
+
+    <bpmn:exclusiveGateway id="areas-aprovaram" name="Todas aprovaram?" default="f-areas-recusaram">
+      <bpmn:incoming>f-areas-avaliaram</bpmn:incoming>
+      <bpmn:outgoing>f-areas-aprovaram</bpmn:outgoing>
+      <bpmn:outgoing>f-areas-recusaram</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
     <bpmn:serviceTask id="desenvolver" name="Desenvolver código">
       <bpmn:extensionElements>
         <zeebe:taskDefinition type="desenvolver" retries="1" />
       </bpmn:extensionElements>
-      <bpmn:incoming>f-refinamento-ok</bpmn:incoming>
+      <bpmn:incoming>f-sem-outras-areas</bpmn:incoming>
+      <bpmn:incoming>f-areas-aprovaram</bpmn:incoming>
       <bpmn:incoming>f-review-bloqueado</bpmn:incoming>
       <bpmn:incoming>f-decisao-review-corrigir</bpmn:incoming>
       <bpmn:incoming>f-decisao-testes-corrigir</bpmn:incoming>
@@ -169,10 +204,19 @@
     <bpmn:sequenceFlow id="f-preparado" sourceRef="preparar-workspace" targetRef="refinar" />
     <bpmn:sequenceFlow id="f-refinado" sourceRef="refinar" targetRef="aprovar-refinamento" />
     <bpmn:sequenceFlow id="f-refinamento-avaliado" sourceRef="aprovar-refinamento" targetRef="refinamento-aprovado" />
-    <bpmn:sequenceFlow id="f-refinamento-ok" name="sim" sourceRef="refinamento-aprovado" targetRef="desenvolver">
+    <bpmn:sequenceFlow id="f-refinamento-ok" name="sim" sourceRef="refinamento-aprovado" targetRef="outras-areas">
       <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=refinamentoAprovado = true</bpmn:conditionExpression>
     </bpmn:sequenceFlow>
     <bpmn:sequenceFlow id="f-refinamento-ajustar" name="ajustar" sourceRef="refinamento-aprovado" targetRef="refinar" />
+    <bpmn:sequenceFlow id="f-com-outras-areas" name="sim" sourceRef="outras-areas" targetRef="aprovar-entre-areas">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=count(areasAfetadas) &gt; 0</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="f-sem-outras-areas" name="não" sourceRef="outras-areas" targetRef="desenvolver" />
+    <bpmn:sequenceFlow id="f-areas-avaliaram" sourceRef="aprovar-entre-areas" targetRef="areas-aprovaram" />
+    <bpmn:sequenceFlow id="f-areas-aprovaram" name="sim" sourceRef="areas-aprovaram" targetRef="desenvolver">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=every a in aprovacoesEntreAreas satisfies a.aprovado = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="f-areas-recusaram" name="recusada" sourceRef="areas-aprovaram" targetRef="refinar" />
     <bpmn:sequenceFlow id="f-desenvolvido" sourceRef="desenvolver" targetRef="revisar" />
     <bpmn:sequenceFlow id="f-revisado" sourceRef="revisar" targetRef="veredito" />
     <bpmn:sequenceFlow id="f-review-aprovado" name="aprovado" sourceRef="veredito" targetRef="testar">
@@ -227,54 +271,65 @@
         <dc:Bounds x="690" y="195" width="50" height="50" />
         <bpmndi:BPMNLabel><dc:Bounds x="690" y="252" width="50" height="14" /></bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s-outras-areas" bpmnElement="outras-areas" isMarkerVisible="true">
+        <dc:Bounds x="790" y="195" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="767" y="252" width="96" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s-aprovar-entre-areas" bpmnElement="aprovar-entre-areas">
+        <dc:Bounds x="880" y="180" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s-areas-aprovaram" bpmnElement="areas-aprovaram" isMarkerVisible="true">
+        <dc:Bounds x="1030" y="195" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1011" y="252" width="88" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="s-desenvolver" bpmnElement="desenvolver">
-        <dc:Bounds x="790" y="180" width="100" height="80" />
+        <dc:Bounds x="1140" y="180" width="100" height="80" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="s-revisar" bpmnElement="revisar">
-        <dc:Bounds x="940" y="180" width="100" height="80" />
+        <dc:Bounds x="1290" y="180" width="100" height="80" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="s-veredito" bpmnElement="veredito" isMarkerVisible="true">
-        <dc:Bounds x="1090" y="195" width="50" height="50" />
-        <bpmndi:BPMNLabel><dc:Bounds x="1058" y="172" width="50" height="14" /></bpmndi:BPMNLabel>
+        <dc:Bounds x="1440" y="195" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1408" y="172" width="50" height="14" /></bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="s-testar" bpmnElement="testar">
-        <dc:Bounds x="1190" y="180" width="100" height="80" />
+        <dc:Bounds x="1540" y="180" width="100" height="80" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="s-testes-aprovados" bpmnElement="testes-aprovados" isMarkerVisible="true">
-        <dc:Bounds x="1340" y="195" width="50" height="50" />
-        <bpmndi:BPMNLabel><dc:Bounds x="1338" y="172" width="54" height="14" /></bpmndi:BPMNLabel>
+        <dc:Bounds x="1690" y="195" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1688" y="172" width="54" height="14" /></bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="s-aprovar-pr" bpmnElement="aprovar-pr">
-        <dc:Bounds x="1440" y="180" width="100" height="80" />
+        <dc:Bounds x="1790" y="180" width="100" height="80" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="s-pr-aprovado" bpmnElement="pr-aprovado" isMarkerVisible="true">
-        <dc:Bounds x="1590" y="195" width="50" height="50" />
-        <bpmndi:BPMNLabel><dc:Bounds x="1590" y="172" width="50" height="14" /></bpmndi:BPMNLabel>
+        <dc:Bounds x="1940" y="195" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1940" y="172" width="50" height="14" /></bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="s-abrir-pr" bpmnElement="abrir-pr">
-        <dc:Bounds x="1690" y="180" width="100" height="80" />
+        <dc:Bounds x="2040" y="180" width="100" height="80" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="s-tarefa-concluida" bpmnElement="tarefa-concluida">
-        <dc:Bounds x="1842" y="202" width="36" height="36" />
-        <bpmndi:BPMNLabel><dc:Bounds x="1818" y="245" width="84" height="14" /></bpmndi:BPMNLabel>
+        <dc:Bounds x="2192" y="202" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="2168" y="245" width="84" height="14" /></bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="s-decidir-review" bpmnElement="decidir-review">
-        <dc:Bounds x="1065" y="320" width="100" height="80" />
+        <dc:Bounds x="1415" y="320" width="100" height="80" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="s-decisao-review" bpmnElement="decisao-review" isMarkerVisible="true">
-        <dc:Bounds x="1090" y="450" width="50" height="50" />
-        <bpmndi:BPMNLabel><dc:Bounds x="1147" y="490" width="46" height="14" /></bpmndi:BPMNLabel>
+        <dc:Bounds x="1440" y="450" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1497" y="490" width="46" height="14" /></bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="s-decidir-testes" bpmnElement="decidir-testes">
-        <dc:Bounds x="1315" y="320" width="100" height="80" />
+        <dc:Bounds x="1665" y="320" width="100" height="80" />
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="s-decisao-testes" bpmnElement="decisao-testes" isMarkerVisible="true">
-        <dc:Bounds x="1340" y="450" width="50" height="50" />
-        <bpmndi:BPMNLabel><dc:Bounds x="1397" y="490" width="46" height="14" /></bpmndi:BPMNLabel>
+        <dc:Bounds x="1690" y="450" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1747" y="490" width="46" height="14" /></bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
       <bpmndi:BPMNShape id="s-tarefa-cancelada" bpmnElement="tarefa-cancelada">
-        <dc:Bounds x="1597" y="457" width="36" height="36" />
-        <bpmndi:BPMNLabel><dc:Bounds x="1571" y="500" width="88" height="14" /></bpmndi:BPMNLabel>
+        <dc:Bounds x="1947" y="457" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1921" y="500" width="88" height="14" /></bpmndi:BPMNLabel>
       </bpmndi:BPMNShape>
 
       <bpmndi:BPMNEdge id="e-inicio" bpmnElement="f-inicio">
@@ -293,78 +348,97 @@
         <di:waypoint x="740" y="220" /><di:waypoint x="790" y="220" />
         <bpmndi:BPMNLabel><dc:Bounds x="752" y="202" width="18" height="14" /></bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-com-outras-areas" bpmnElement="f-com-outras-areas">
+        <di:waypoint x="840" y="220" /><di:waypoint x="880" y="220" />
+        <bpmndi:BPMNLabel><dc:Bounds x="848" y="202" width="18" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-sem-outras-areas" bpmnElement="f-sem-outras-areas">
+        <di:waypoint x="815" y="245" /><di:waypoint x="815" y="300" /><di:waypoint x="1215" y="300" /><di:waypoint x="1215" y="260" />
+        <bpmndi:BPMNLabel><dc:Bounds x="822" y="276" width="20" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-areas-avaliaram" bpmnElement="f-areas-avaliaram">
+        <di:waypoint x="980" y="220" /><di:waypoint x="1030" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-areas-aprovaram" bpmnElement="f-areas-aprovaram">
+        <di:waypoint x="1080" y="220" /><di:waypoint x="1140" y="220" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1098" y="202" width="18" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-areas-recusaram" bpmnElement="f-areas-recusaram">
+        <di:waypoint x="1055" y="195" /><di:waypoint x="1055" y="140" /><di:waypoint x="460" y="140" /><di:waypoint x="460" y="180" />
+        <bpmndi:BPMNLabel><dc:Bounds x="740" y="143" width="50" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="e-refinamento-ajustar" bpmnElement="f-refinamento-ajustar">
         <di:waypoint x="715" y="195" /><di:waypoint x="715" y="120" /><di:waypoint x="440" y="120" /><di:waypoint x="440" y="180" />
         <bpmndi:BPMNLabel><dc:Bounds x="560" y="102" width="36" height="14" /></bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="e-desenvolvido" bpmnElement="f-desenvolvido">
-        <di:waypoint x="890" y="220" /><di:waypoint x="940" y="220" />
+        <di:waypoint x="1240" y="220" /><di:waypoint x="1290" y="220" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="e-revisado" bpmnElement="f-revisado">
-        <di:waypoint x="1040" y="220" /><di:waypoint x="1090" y="220" />
+        <di:waypoint x="1390" y="220" /><di:waypoint x="1440" y="220" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="e-review-aprovado" bpmnElement="f-review-aprovado">
-        <di:waypoint x="1140" y="220" /><di:waypoint x="1190" y="220" />
-        <bpmndi:BPMNLabel><dc:Bounds x="1142" y="224" width="44" height="14" /></bpmndi:BPMNLabel>
+        <di:waypoint x="1490" y="220" /><di:waypoint x="1540" y="220" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1492" y="224" width="44" height="14" /></bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="e-review-bloqueado" bpmnElement="f-review-bloqueado">
-        <di:waypoint x="1115" y="195" /><di:waypoint x="1115" y="80" /><di:waypoint x="840" y="80" /><di:waypoint x="840" y="180" />
-        <bpmndi:BPMNLabel><dc:Bounds x="952" y="62" width="52" height="14" /></bpmndi:BPMNLabel>
+        <di:waypoint x="1465" y="195" /><di:waypoint x="1465" y="80" /><di:waypoint x="1190" y="80" /><di:waypoint x="1190" y="180" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1302" y="62" width="52" height="14" /></bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="e-review-esgotado" bpmnElement="f-review-esgotado">
-        <di:waypoint x="1115" y="245" /><di:waypoint x="1115" y="320" />
-        <bpmndi:BPMNLabel><dc:Bounds x="1024" y="276" width="86" height="14" /></bpmndi:BPMNLabel>
+        <di:waypoint x="1465" y="245" /><di:waypoint x="1465" y="320" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1374" y="276" width="86" height="14" /></bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="e-review-decidido" bpmnElement="f-review-decidido">
-        <di:waypoint x="1115" y="400" /><di:waypoint x="1115" y="450" />
+        <di:waypoint x="1465" y="400" /><di:waypoint x="1465" y="450" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="e-decisao-review-corrigir" bpmnElement="f-decisao-review-corrigir">
-        <di:waypoint x="1090" y="475" /><di:waypoint x="840" y="475" /><di:waypoint x="840" y="260" />
-        <bpmndi:BPMNLabel><dc:Bounds x="945" y="457" width="38" height="14" /></bpmndi:BPMNLabel>
+        <di:waypoint x="1440" y="475" /><di:waypoint x="1190" y="475" /><di:waypoint x="1190" y="260" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1295" y="457" width="38" height="14" /></bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="e-decisao-review-seguir" bpmnElement="f-decisao-review-seguir">
-        <di:waypoint x="1140" y="475" /><di:waypoint x="1240" y="475" /><di:waypoint x="1240" y="260" />
-        <bpmndi:BPMNLabel><dc:Bounds x="1172" y="457" width="32" height="14" /></bpmndi:BPMNLabel>
+        <di:waypoint x="1490" y="475" /><di:waypoint x="1590" y="475" /><di:waypoint x="1590" y="260" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1522" y="457" width="32" height="14" /></bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="e-decisao-review-cancelar" bpmnElement="f-decisao-review-cancelar">
-        <di:waypoint x="1115" y="500" /><di:waypoint x="1115" y="580" /><di:waypoint x="1615" y="580" /><di:waypoint x="1615" y="493" />
-        <bpmndi:BPMNLabel><dc:Bounds x="1340" y="562" width="44" height="14" /></bpmndi:BPMNLabel>
+        <di:waypoint x="1465" y="500" /><di:waypoint x="1465" y="580" /><di:waypoint x="1965" y="580" /><di:waypoint x="1965" y="493" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1690" y="562" width="44" height="14" /></bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="e-testado" bpmnElement="f-testado">
-        <di:waypoint x="1290" y="220" /><di:waypoint x="1340" y="220" />
+        <di:waypoint x="1640" y="220" /><di:waypoint x="1690" y="220" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="e-testes-ok" bpmnElement="f-testes-ok">
-        <di:waypoint x="1390" y="220" /><di:waypoint x="1440" y="220" />
-        <bpmndi:BPMNLabel><dc:Bounds x="1402" y="202" width="18" height="14" /></bpmndi:BPMNLabel>
+        <di:waypoint x="1740" y="220" /><di:waypoint x="1790" y="220" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1752" y="202" width="18" height="14" /></bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="e-testes-falharam" bpmnElement="f-testes-falharam">
-        <di:waypoint x="1365" y="245" /><di:waypoint x="1365" y="320" />
-        <bpmndi:BPMNLabel><dc:Bounds x="1372" y="276" width="20" height="14" /></bpmndi:BPMNLabel>
+        <di:waypoint x="1715" y="245" /><di:waypoint x="1715" y="320" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1722" y="276" width="20" height="14" /></bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="e-testes-decidido" bpmnElement="f-testes-decidido">
-        <di:waypoint x="1365" y="400" /><di:waypoint x="1365" y="450" />
+        <di:waypoint x="1715" y="400" /><di:waypoint x="1715" y="450" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="e-decisao-testes-corrigir" bpmnElement="f-decisao-testes-corrigir">
-        <di:waypoint x="1365" y="500" /><di:waypoint x="1365" y="540" /><di:waypoint x="820" y="540" /><di:waypoint x="820" y="260" />
-        <bpmndi:BPMNLabel><dc:Bounds x="945" y="522" width="38" height="14" /></bpmndi:BPMNLabel>
+        <di:waypoint x="1715" y="500" /><di:waypoint x="1715" y="540" /><di:waypoint x="1170" y="540" /><di:waypoint x="1170" y="260" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1295" y="522" width="38" height="14" /></bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="e-decisao-testes-cancelar" bpmnElement="f-decisao-testes-cancelar">
-        <di:waypoint x="1390" y="475" /><di:waypoint x="1597" y="475" />
-        <bpmndi:BPMNLabel><dc:Bounds x="1472" y="457" width="44" height="14" /></bpmndi:BPMNLabel>
+        <di:waypoint x="1740" y="475" /><di:waypoint x="1947" y="475" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1822" y="457" width="44" height="14" /></bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="e-pr-avaliado" bpmnElement="f-pr-avaliado">
-        <di:waypoint x="1540" y="220" /><di:waypoint x="1590" y="220" />
+        <di:waypoint x="1890" y="220" /><di:waypoint x="1940" y="220" />
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="e-pr-ok" bpmnElement="f-pr-ok">
-        <di:waypoint x="1640" y="220" /><di:waypoint x="1690" y="220" />
-        <bpmndi:BPMNLabel><dc:Bounds x="1652" y="202" width="18" height="14" /></bpmndi:BPMNLabel>
+        <di:waypoint x="1990" y="220" /><di:waypoint x="2040" y="220" />
+        <bpmndi:BPMNLabel><dc:Bounds x="2002" y="202" width="18" height="14" /></bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="e-pr-cancelar" bpmnElement="f-pr-cancelar">
-        <di:waypoint x="1615" y="245" /><di:waypoint x="1615" y="457" />
-        <bpmndi:BPMNLabel><dc:Bounds x="1622" y="340" width="20" height="14" /></bpmndi:BPMNLabel>
+        <di:waypoint x="1965" y="245" /><di:waypoint x="1965" y="457" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1972" y="340" width="20" height="14" /></bpmndi:BPMNLabel>
       </bpmndi:BPMNEdge>
       <bpmndi:BPMNEdge id="e-pr-aberto" bpmnElement="f-pr-aberto">
-        <di:waypoint x="1790" y="220" /><di:waypoint x="1842" y="220" />
+        <di:waypoint x="2140" y="220" /><di:waypoint x="2192" y="220" />
       </bpmndi:BPMNEdge>
     </bpmndi:BPMNPlane>
   </bpmndi:BPMNDiagram>

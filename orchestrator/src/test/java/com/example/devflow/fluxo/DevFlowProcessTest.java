@@ -1,6 +1,7 @@
 package com.example.devflow.fluxo;
 
 import static io.camunda.process.test.api.CamundaAssert.assertThat;
+import static io.camunda.process.test.api.assertions.UserTaskSelectors.byElementId;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -26,6 +27,7 @@ import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Deque;
 import java.util.EnumMap;
 import java.util.List;
@@ -117,6 +119,48 @@ class DevFlowProcessTest {
     }
 
     @Test
+    void mudancaQueAfetaOutrasAreasEsperaAAprovacaoDeCadaUma() {
+        responder(Etapa.REFINAMENTO, refinamentoAfetando("credito", "pagamentos"));
+        ProcessInstanceEvent instancia = iniciar();
+        contexto.completeUserTask("aprovar-refinamento", Map.of("refinamentoAprovado", true));
+
+        assertThat(instancia).hasActiveElement("aprovar-entre-areas", 3).hasNotActivatedElements("desenvolver");
+        contexto.completeUserTask(byElementId("aprovar-entre-areas"), Map.of("aprovado", true));
+        assertThat(instancia).hasActiveElement("aprovar-entre-areas", 2);
+        contexto.completeUserTask(byElementId("aprovar-entre-areas"), Map.of("aprovado", true));
+
+        assertThat(instancia).hasActiveElements("aprovar-pr").hasCompletedElement("aprovar-entre-areas", 3);
+        assertThat(chamadas.stream().filter(c -> c.etapa() == Etapa.REVISAO).findFirst().orElseThrow().prompt())
+                .contains("Áreas que aprovaram a mudança: credito, pagamentos");
+    }
+
+    @Test
+    void areaQueRecusaDevolveORefinamentoComOMotivo() {
+        responder(Etapa.REFINAMENTO, refinamentoAfetando("credito"));
+        ProcessInstanceEvent instancia = iniciar();
+        contexto.completeUserTask("aprovar-refinamento", Map.of("refinamentoAprovado", true));
+
+        contexto.completeUserTask(byElementId("aprovar-entre-areas"),
+                Map.of("aprovado", false, "motivo", "o loan-service ainda não trata o campo novo"));
+
+        assertThat(instancia).hasActiveElements("aprovar-refinamento")
+                .hasCompletedElement("refinar", 2)
+                .hasNotActivatedElements("desenvolver")
+                .hasVariable("aprovacoesEntreAreas", null);
+        assertThat(chamadas.get(1).prompt()).contains("- credito: o loan-service ainda não trata o campo novo");
+    }
+
+    @Test
+    void semOutrasAreasVaiDiretoParaODesenvolvimento() {
+        ProcessInstanceEvent instancia = iniciar();
+        contexto.completeUserTask("aprovar-refinamento", Map.of("refinamentoAprovado", true));
+
+        assertThat(instancia).hasActiveElements("aprovar-pr").hasNotActivatedElements("aprovar-entre-areas");
+        assertThat(chamadas.stream().filter(c -> c.etapa() == Etapa.REVISAO).findFirst().orElseThrow().prompt())
+                .contains("Áreas que aprovaram a mudança: nenhuma");
+    }
+
+    @Test
     void reviewBloqueadoVoltaParaODesenvolvimentoAteOLimite() {
         responder(Etapa.REVISAO, "{\"veredito\":\"bloqueado\",\"bloqueantes\":1,\"importantes\":0,\"resumo\":\"B1 saldo\"}");
         ProcessInstanceEvent instancia = iniciar();
@@ -195,6 +239,12 @@ class DevFlowProcessTest {
                 .hasVariable("branchBase", "main")
                 .hasVariable("limiteDeRevisoes", 3);
         verify(workspaces).preparar("validar-cpf", "/tmp/customer-service", "main");
+    }
+
+    private static String refinamentoAfetando(String... areas) {
+        String lista = String.join(",", Arrays.stream(areas).map(a ->
+                "{\"area\":\"" + a + "\",\"times\":[\"Time " + a + "\"],\"servicos\":[\"x-service\"],\"contratos\":[\"account-opened\"]}").toList());
+        return "{\"status\":\"pronto\",\"resumo\":\"campo novo\",\"perguntas\":[],\"areasAfetadas\":[" + lista + "]}";
     }
 
     private void responder(Etapa etapa, String... jsons) {

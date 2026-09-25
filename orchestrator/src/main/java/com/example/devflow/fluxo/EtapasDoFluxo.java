@@ -7,6 +7,8 @@ import com.example.devflow.agente.Etapa;
 import com.example.devflow.agente.ResultadoDoAgente;
 import com.example.devflow.workspace.Workspace;
 import com.example.devflow.workspace.Workspaces;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.camunda.client.annotation.JobWorker;
 import io.camunda.client.annotation.Variable;
 import java.math.BigDecimal;
@@ -15,6 +17,7 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.StreamSupport;
 import org.springframework.stereotype.Component;
 
@@ -24,14 +27,19 @@ public class EtapasDoFluxo {
     private static final long UMA_HORA = 3_600_000L;
     private static final int LIMITE_DO_DOCUMENTO = 60_000;
 
+    private static final TypeReference<List<Map<String, Object>>> AREAS = new TypeReference<>() {
+    };
+
     private final Agente agente;
     private final Workspaces workspaces;
     private final DevFlowProperties properties;
+    private final ObjectMapper json;
 
-    public EtapasDoFluxo(Agente agente, Workspaces workspaces, DevFlowProperties properties) {
+    public EtapasDoFluxo(Agente agente, Workspaces workspaces, DevFlowProperties properties, ObjectMapper json) {
         this.agente = agente;
         this.workspaces = workspaces;
         this.properties = properties;
+        this.json = json;
     }
 
     @JobWorker(type = "preparar-workspace")
@@ -56,11 +64,12 @@ public class EtapasDoFluxo {
                                        @Variable(name = "workspace") String workspace,
                                        @Variable(name = "rodadaDeRefinamento") int rodadaAnterior,
                                        @Variable(name = "observacoesDoRefinamento", optional = true) String observacoes,
+                                       @Variable(name = "aprovacoesEntreAreas", optional = true) List<Map<String, Object>> aprovacoes,
                                        @Variable(name = "custoUsd") double custo) {
         Path diretorio = Path.of(workspace);
         int rodada = rodadaAnterior + 1;
         ResultadoDoAgente resultado = executar(Etapa.REFINAMENTO, diretorio, tarefa, "refinamento-" + rodada,
-                Prompts.refinamento(tarefa, descricao, rodada > 1 ? observacoes : null));
+                Prompts.refinamento(tarefa, descricao, rodada > 1 ? observacoes : null, recusas(aprovacoes)));
         Map<String, Object> variaveis = new HashMap<>();
         variaveis.put("rodadaDeRefinamento", rodada);
         variaveis.put("refinamentoStatus", resultado.texto("status"));
@@ -68,6 +77,9 @@ public class EtapasDoFluxo {
         variaveis.put("refinamentoPerguntas", lista(resultado));
         variaveis.put("refinamentoDocumento", documento(diretorio, tarefa, "refinamento.md"));
         variaveis.put("refinamentoAprovado", false);
+        variaveis.put("areasAfetadas", areas(resultado));
+        variaveis.put("observacoesDoRefinamento", null);
+        variaveis.put("aprovacoesEntreAreas", null);
         variaveis.put("custoUsd", somar(custo, resultado));
         return variaveis;
     }
@@ -100,13 +112,14 @@ public class EtapasDoFluxo {
                                        @Variable(name = "commitBase") String commitBase,
                                        @Variable(name = "commitAtual") String commitAtual,
                                        @Variable(name = "rodadaDeRevisao") int rodadaAnterior,
+                                       @Variable(name = "areasAfetadas", optional = true) List<Map<String, Object>> areas,
                                        @Variable(name = "custoUsd") double custo) {
         Path diretorio = Path.of(workspace);
         workspaces.restaurar(diretorio, commitAtual);
         int rodada = rodadaAnterior + 1;
         String arquivo = "review-" + rodada + ".md";
         ResultadoDoAgente resultado = executar(Etapa.REVISAO, diretorio, tarefa, "revisao-" + rodada,
-                Prompts.revisao(tarefa, commitBase, rodada));
+                Prompts.revisao(tarefa, commitBase, rodada, nomes(areas)));
         String veredito = resultado.texto("veredito");
         Map<String, Object> variaveis = new HashMap<>();
         variaveis.put("rodadaDeRevisao", rodada);
@@ -172,6 +185,29 @@ public class EtapasDoFluxo {
     private String documento(Path diretorio, String tarefa, String nome) {
         String conteudo = PullRequest.semCabecalho(workspaces.documento(diretorio, tarefa, nome));
         return conteudo.length() > LIMITE_DO_DOCUMENTO ? conteudo.substring(0, LIMITE_DO_DOCUMENTO) : conteudo;
+    }
+
+    private List<Map<String, Object>> areas(ResultadoDoAgente resultado) {
+        List<Map<String, Object>> areas = json.convertValue(resultado.saida().path("areasAfetadas"), AREAS);
+        return areas == null ? List.of() : areas;
+    }
+
+    private static List<String> recusas(List<Map<String, Object>> aprovacoes) {
+        if (aprovacoes == null) {
+            return List.of();
+        }
+        return aprovacoes.stream()
+                .filter(Objects::nonNull)
+                .filter(a -> !Boolean.TRUE.equals(a.get("aprovado")))
+                .map(a -> a.get("area") + ": " + Objects.requireNonNullElse(a.get("motivo"), "sem motivo"))
+                .toList();
+    }
+
+    private static List<String> nomes(List<Map<String, Object>> areas) {
+        if (areas == null) {
+            return List.of();
+        }
+        return areas.stream().map(a -> String.valueOf(a.get("area"))).toList();
     }
 
     private static List<String> lista(ResultadoDoAgente resultado) {

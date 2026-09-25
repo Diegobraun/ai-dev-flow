@@ -32,6 +32,12 @@ afetados, critérios de aceite e perguntas em aberto.
 **Pare e peça aprovação.** Se o usuário pedir ajuste, chame o `refinador` de novo com as observações. Não siga
 sem um "pode seguir" explícito.
 
+Se a seção "Áreas afetadas" listar outras áreas, mostre cada uma com os times e o que muda para eles e diga que
+esses times precisam concordar antes do desenvolvimento. Pergunte se já foi combinado. Recusa de alguma área
+volta para o refinador com o motivo.
+
+Na chamada do `revisor`, passe as áreas aprovadas.
+
 ## 2. Desenvolvimento
 
 Chame o `desenvolvedor` com o identificador e a rodada. Na primeira rodada, a instrução é implementar o

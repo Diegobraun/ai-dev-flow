@@ -1,0 +1,47 @@
+{
+  "components": [
+    {
+      "type": "text",
+      "text": "# Mudança que afeta a área {{aprovacao.area}}\n\n**Tarefa:** {{tarefa}} · **repositório** {{repositorio}}\n\n{{descricao}}",
+      "id": "aprovar-entre-areas-0"
+    },
+    {
+      "type": "text",
+      "text": "### O que muda para vocês\n\n**Times:** {{#loop aprovacao.times}}{{this}} {{/loop}}\n\n**Serviços:** {{#loop aprovacao.servicos}}{{this}} {{/loop}}\n\n{{#loop aprovacao.contratos}}- {{this}}\n{{/loop}}",
+      "id": "aprovar-entre-areas-1"
+    },
+    {
+      "type": "text",
+      "text": "---\n\n{{refinamentoDocumento}}",
+      "id": "aprovar-entre-areas-2"
+    },
+    {
+      "type": "checkbox",
+      "label": "A área aprova a mudança",
+      "key": "aprovado",
+      "defaultValue": false,
+      "id": "aprovar-entre-areas-3"
+    },
+    {
+      "type": "textarea",
+      "label": "Motivo da recusa (volta para o refinamento)",
+      "key": "motivo",
+      "validate": {
+        "required": true
+      },
+      "conditional": {
+        "hide": "=aprovado = true"
+      },
+      "id": "aprovar-entre-areas-4"
+    }
+  ],
+  "type": "default",
+  "id": "aprovar-entre-areas",
+  "executionPlatform": "Camunda Cloud",
+  "executionPlatformVersion": "8.8.0",
+  "exporter": {
+    "name": "devflow",
+    "version": "0.1.0"
+  },
+  "schemaVersion": 16
+}
