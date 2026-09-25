@@ -1,0 +1,16 @@
+{
+  "name": "ai-dev-flow",
+  "owner": {
+    "name": "Diegobraun"
+  },
+  "metadata": {
+    "description": "Skills e agentes para um fluxo de desenvolvimento com um agente por etapa"
+  },
+  "plugins": [
+    {
+      "name": "devflow",
+      "source": "./plugin",
+      "description": "Fluxo de desenvolvimento com um agente por etapa: refinamento técnico, desenvolvimento, code review e teste integrado"
+    }
+  ]
+}

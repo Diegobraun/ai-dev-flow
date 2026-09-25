@@ -1,0 +1,1 @@
+{"type":"object","additionalProperties":false,"required":["status","resumo","perguntas"],"properties":{"status":{"type":"string","enum":["pronto","com-perguntas"]},"resumo":{"type":"string","description":"Até cinco linhas: objetivo, mudanças propostas, contratos afetados"},"perguntas":{"type":"array","items":{"type":"string"}}}}

@@ -1,0 +1,46 @@
+{
+  "components": [
+    {
+      "type": "text",
+      "text": "# Code review bloqueado: {{tarefa}}\n\n{{rodadaDeRevisao}} rodadas de review, **{{bloqueantes}} bloqueante(s)** na última. Custo até aqui US$ {{custoUsd}}.\n\n{{reviewResumo}}",
+      "id": "decidir-review-0"
+    },
+    {
+      "type": "text",
+      "text": "---\n\n{{reviewDocumento}}",
+      "id": "decidir-review-1"
+    },
+    {
+      "type": "radio",
+      "label": "Decisão",
+      "key": "decisaoDoReview",
+      "validate": {
+        "required": true
+      },
+      "values": [
+        {
+          "label": "Corrigir mais uma vez",
+          "value": "corrigir"
+        },
+        {
+          "label": "Seguir para os testes mesmo assim",
+          "value": "seguir"
+        },
+        {
+          "label": "Cancelar a tarefa",
+          "value": "cancelar"
+        }
+      ],
+      "id": "decidir-review-2"
+    }
+  ],
+  "type": "default",
+  "id": "decidir-review",
+  "executionPlatform": "Camunda Cloud",
+  "executionPlatformVersion": "8.8.0",
+  "exporter": {
+    "name": "devflow",
+    "version": "0.1.0"
+  },
+  "schemaVersion": 16
+}

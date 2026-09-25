@@ -1,0 +1,30 @@
+{
+  "components": [
+    {
+      "type": "text",
+      "text": "# Pronto para o pull request: {{tarefa}}\n\nBranch `{{branch}}` · {{rodadaDeRevisao}} rodada(s) de review · custo total US$ {{custoUsd}}\n\n**Desenvolvimento:** {{desenvolvimentoResumo}}\n\n**Review:** {{reviewResumo}}\n\n**Testes:** {{testesResumo}}",
+      "id": "aprovar-pr-0"
+    },
+    {
+      "type": "text",
+      "text": "---\n\n{{testesDocumento}}",
+      "id": "aprovar-pr-1"
+    },
+    {
+      "type": "checkbox",
+      "label": "Abrir o pull request",
+      "key": "prAprovado",
+      "defaultValue": false,
+      "id": "aprovar-pr-2"
+    }
+  ],
+  "type": "default",
+  "id": "aprovar-pr",
+  "executionPlatform": "Camunda Cloud",
+  "executionPlatformVersion": "8.8.0",
+  "exporter": {
+    "name": "devflow",
+    "version": "0.1.0"
+  },
+  "schemaVersion": 16
+}

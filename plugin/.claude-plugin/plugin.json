@@ -1,0 +1,10 @@
+{
+  "name": "devflow",
+  "version": "0.1.0",
+  "description": "Fluxo de desenvolvimento com um agente por etapa: refinamento técnico, desenvolvimento, code review e teste integrado",
+  "author": {
+    "name": "Diegobraun"
+  },
+  "repository": "https://github.com/Diegobraun/ai-dev-flow",
+  "license": "MIT"
+}

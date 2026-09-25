@@ -1,0 +1,44 @@
+{
+  "components": [
+    {
+      "type": "text",
+      "text": "# Refinamento: {{tarefa}}\n\n**Status:** {{refinamentoStatus}} · **rodada** {{rodadaDeRefinamento}} · **custo até aqui** US$ {{custoUsd}}\n\n{{refinamentoResumo}}",
+      "id": "aprovar-refinamento-0"
+    },
+    {
+      "type": "text",
+      "text": "{{#if refinamentoPerguntas}}### Perguntas em aberto\n\n{{#loop refinamentoPerguntas}}- {{this}}\n{{/loop}}{{/if}}",
+      "id": "aprovar-refinamento-1"
+    },
+    {
+      "type": "text",
+      "text": "---\n\n{{refinamentoDocumento}}",
+      "id": "aprovar-refinamento-2"
+    },
+    {
+      "type": "checkbox",
+      "label": "Refinamento aprovado, pode desenvolver",
+      "key": "refinamentoAprovado",
+      "defaultValue": false,
+      "id": "aprovar-refinamento-3"
+    },
+    {
+      "type": "textarea",
+      "label": "Observações para o refinador (respostas às perguntas, ajustes)",
+      "key": "observacoesDoRefinamento",
+      "conditional": {
+        "hide": "=refinamentoAprovado = true"
+      },
+      "id": "aprovar-refinamento-4"
+    }
+  ],
+  "type": "default",
+  "id": "aprovar-refinamento",
+  "executionPlatform": "Camunda Cloud",
+  "executionPlatformVersion": "8.8.0",
+  "exporter": {
+    "name": "devflow",
+    "version": "0.1.0"
+  },
+  "schemaVersion": 16
+}

@@ -1,0 +1,1 @@
+{"type":"object","additionalProperties":false,"required":["resultado","criterios","falhas","resumo"],"properties":{"resultado":{"type":"string","enum":["aprovado","falhou"]},"criterios":{"type":"integer","minimum":0,"description":"Critérios de aceite cobertos por teste"},"falhas":{"type":"integer","minimum":0},"resumo":{"type":"string"}}}

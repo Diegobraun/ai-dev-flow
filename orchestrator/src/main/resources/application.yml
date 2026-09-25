@@ -1,0 +1,29 @@
+server:
+  port: 8070
+
+spring:
+  application:
+    name: devflow-orchestrator
+
+camunda:
+  client:
+    mode: self-managed
+    grpc-address: ${CAMUNDA_GRPC_URL:http://localhost:26600}
+    rest-address: ${CAMUNDA_REST_URL:http://localhost:8180}
+    auth:
+      method: none
+
+devflow:
+  workspaces: ${DEVFLOW_WORKSPACES:./workspaces}
+  plugin: ${DEVFLOW_PLUGIN:../plugin}
+  claude: ${DEVFLOW_CLAUDE:claude}
+  mcp-config: ${DEVFLOW_MCP_CONFIG:}
+  timeout: 45m
+  orcamento-por-etapa-usd: 5
+  limite-de-revisoes: 3
+  abrir-pull-request: ${DEVFLOW_ABRIR_PR:false}
+  modelos:
+    refinador: ${DEVFLOW_MODELO_REFINADOR:}
+    desenvolvedor: ${DEVFLOW_MODELO_DESENVOLVEDOR:}
+    revisor: ${DEVFLOW_MODELO_REVISOR:}
+    testador: ${DEVFLOW_MODELO_TESTADOR:}

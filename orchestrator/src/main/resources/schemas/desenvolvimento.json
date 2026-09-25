@@ -1,0 +1,1 @@
+{"type":"object","additionalProperties":false,"required":["build","resumo","commits"],"properties":{"build":{"type":"string","enum":["ok","falhou"]},"resumo":{"type":"string","description":"Até cinco linhas: arquivos alterados, desvios do refinamento, pontos do review tratados"},"commits":{"type":"integer","minimum":0}}}

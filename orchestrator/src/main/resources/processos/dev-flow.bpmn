@@ -1,0 +1,361 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI"
+                  xmlns:dc="http://www.omg.org/spec/DD/20100524/DC"
+                  xmlns:di="http://www.omg.org/spec/DD/20100524/DI"
+                  xmlns:zeebe="http://camunda.org/schema/zeebe/1.0"
+                  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                  xmlns:modeler="http://camunda.org/schema/modeler/1.0"
+                  id="definitions-dev-flow"
+                  targetNamespace="http://example.com/devflow"
+                  exporter="devflow"
+                  modeler:executionPlatform="Camunda Cloud"
+                  modeler:executionPlatformVersion="8.8.0">
+
+  <bpmn:process id="dev-flow" name="Fluxo de desenvolvimento com agentes" isExecutable="true">
+
+    <bpmn:startEvent id="tarefa-recebida" name="Tarefa recebida">
+      <bpmn:outgoing>f-inicio</bpmn:outgoing>
+    </bpmn:startEvent>
+
+    <bpmn:serviceTask id="preparar-workspace" name="Preparar workspace">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="preparar-workspace" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>f-inicio</bpmn:incoming>
+      <bpmn:outgoing>f-preparado</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="refinar" name="Refinamento técnico">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="refinar" retries="1" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>f-preparado</bpmn:incoming>
+      <bpmn:incoming>f-refinamento-ajustar</bpmn:incoming>
+      <bpmn:outgoing>f-refinado</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:userTask id="aprovar-refinamento" name="Aprovar refinamento">
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition formId="aprovar-refinamento" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>f-refinado</bpmn:incoming>
+      <bpmn:outgoing>f-refinamento-avaliado</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:exclusiveGateway id="refinamento-aprovado" name="Aprovado?" default="f-refinamento-ajustar">
+      <bpmn:incoming>f-refinamento-avaliado</bpmn:incoming>
+      <bpmn:outgoing>f-refinamento-ok</bpmn:outgoing>
+      <bpmn:outgoing>f-refinamento-ajustar</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:serviceTask id="desenvolver" name="Desenvolver código">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="desenvolver" retries="1" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>f-refinamento-ok</bpmn:incoming>
+      <bpmn:incoming>f-review-bloqueado</bpmn:incoming>
+      <bpmn:incoming>f-decisao-review-corrigir</bpmn:incoming>
+      <bpmn:incoming>f-decisao-testes-corrigir</bpmn:incoming>
+      <bpmn:outgoing>f-desenvolvido</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:serviceTask id="revisar" name="Code review">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="revisar" retries="1" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>f-desenvolvido</bpmn:incoming>
+      <bpmn:outgoing>f-revisado</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:exclusiveGateway id="veredito" name="Veredito?" default="f-review-esgotado">
+      <bpmn:incoming>f-revisado</bpmn:incoming>
+      <bpmn:outgoing>f-review-aprovado</bpmn:outgoing>
+      <bpmn:outgoing>f-review-bloqueado</bpmn:outgoing>
+      <bpmn:outgoing>f-review-esgotado</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:userTask id="decidir-review" name="Decidir sobre o review">
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition formId="decidir-review" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>f-review-esgotado</bpmn:incoming>
+      <bpmn:outgoing>f-review-decidido</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:exclusiveGateway id="decisao-review" name="Decisão?" default="f-decisao-review-cancelar">
+      <bpmn:incoming>f-review-decidido</bpmn:incoming>
+      <bpmn:outgoing>f-decisao-review-corrigir</bpmn:outgoing>
+      <bpmn:outgoing>f-decisao-review-seguir</bpmn:outgoing>
+      <bpmn:outgoing>f-decisao-review-cancelar</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:serviceTask id="testar" name="Teste integrado">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="testar" retries="1" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>f-review-aprovado</bpmn:incoming>
+      <bpmn:incoming>f-decisao-review-seguir</bpmn:incoming>
+      <bpmn:outgoing>f-testado</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:exclusiveGateway id="testes-aprovados" name="Testes ok?" default="f-testes-falharam">
+      <bpmn:incoming>f-testado</bpmn:incoming>
+      <bpmn:outgoing>f-testes-ok</bpmn:outgoing>
+      <bpmn:outgoing>f-testes-falharam</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:userTask id="decidir-testes" name="Decidir sobre os testes">
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition formId="decidir-testes" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>f-testes-falharam</bpmn:incoming>
+      <bpmn:outgoing>f-testes-decidido</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:exclusiveGateway id="decisao-testes" name="Decisão?" default="f-decisao-testes-cancelar">
+      <bpmn:incoming>f-testes-decidido</bpmn:incoming>
+      <bpmn:outgoing>f-decisao-testes-corrigir</bpmn:outgoing>
+      <bpmn:outgoing>f-decisao-testes-cancelar</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:userTask id="aprovar-pr" name="Aprovar pull request">
+      <bpmn:extensionElements>
+        <zeebe:userTask />
+        <zeebe:formDefinition formId="aprovar-pr" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>f-testes-ok</bpmn:incoming>
+      <bpmn:outgoing>f-pr-avaliado</bpmn:outgoing>
+    </bpmn:userTask>
+
+    <bpmn:exclusiveGateway id="pr-aprovado" name="Aprovado?" default="f-pr-cancelar">
+      <bpmn:incoming>f-pr-avaliado</bpmn:incoming>
+      <bpmn:outgoing>f-pr-ok</bpmn:outgoing>
+      <bpmn:outgoing>f-pr-cancelar</bpmn:outgoing>
+    </bpmn:exclusiveGateway>
+
+    <bpmn:serviceTask id="abrir-pr" name="Abrir pull request">
+      <bpmn:extensionElements>
+        <zeebe:taskDefinition type="abrir-pr" retries="3" />
+      </bpmn:extensionElements>
+      <bpmn:incoming>f-pr-ok</bpmn:incoming>
+      <bpmn:outgoing>f-pr-aberto</bpmn:outgoing>
+    </bpmn:serviceTask>
+
+    <bpmn:endEvent id="tarefa-concluida" name="Tarefa concluída">
+      <bpmn:incoming>f-pr-aberto</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:endEvent id="tarefa-cancelada" name="Tarefa cancelada">
+      <bpmn:incoming>f-decisao-review-cancelar</bpmn:incoming>
+      <bpmn:incoming>f-decisao-testes-cancelar</bpmn:incoming>
+      <bpmn:incoming>f-pr-cancelar</bpmn:incoming>
+    </bpmn:endEvent>
+
+    <bpmn:sequenceFlow id="f-inicio" sourceRef="tarefa-recebida" targetRef="preparar-workspace" />
+    <bpmn:sequenceFlow id="f-preparado" sourceRef="preparar-workspace" targetRef="refinar" />
+    <bpmn:sequenceFlow id="f-refinado" sourceRef="refinar" targetRef="aprovar-refinamento" />
+    <bpmn:sequenceFlow id="f-refinamento-avaliado" sourceRef="aprovar-refinamento" targetRef="refinamento-aprovado" />
+    <bpmn:sequenceFlow id="f-refinamento-ok" name="sim" sourceRef="refinamento-aprovado" targetRef="desenvolver">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=refinamentoAprovado = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="f-refinamento-ajustar" name="ajustar" sourceRef="refinamento-aprovado" targetRef="refinar" />
+    <bpmn:sequenceFlow id="f-desenvolvido" sourceRef="desenvolver" targetRef="revisar" />
+    <bpmn:sequenceFlow id="f-revisado" sourceRef="revisar" targetRef="veredito" />
+    <bpmn:sequenceFlow id="f-review-aprovado" name="aprovado" sourceRef="veredito" targetRef="testar">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=veredito = "aprovado"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="f-review-bloqueado" name="bloqueado" sourceRef="veredito" targetRef="desenvolver">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=veredito = "bloqueado" and rodadaDeRevisao &lt; limiteDeRevisoes</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="f-review-esgotado" name="limite de rodadas" sourceRef="veredito" targetRef="decidir-review" />
+    <bpmn:sequenceFlow id="f-review-decidido" sourceRef="decidir-review" targetRef="decisao-review" />
+    <bpmn:sequenceFlow id="f-decisao-review-corrigir" name="corrigir" sourceRef="decisao-review" targetRef="desenvolver">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=decisaoDoReview = "corrigir"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="f-decisao-review-seguir" name="seguir" sourceRef="decisao-review" targetRef="testar">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=decisaoDoReview = "seguir"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="f-decisao-review-cancelar" name="cancelar" sourceRef="decisao-review" targetRef="tarefa-cancelada" />
+    <bpmn:sequenceFlow id="f-testado" sourceRef="testar" targetRef="testes-aprovados" />
+    <bpmn:sequenceFlow id="f-testes-ok" name="sim" sourceRef="testes-aprovados" targetRef="aprovar-pr">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=testesAprovados = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="f-testes-falharam" name="não" sourceRef="testes-aprovados" targetRef="decidir-testes" />
+    <bpmn:sequenceFlow id="f-testes-decidido" sourceRef="decidir-testes" targetRef="decisao-testes" />
+    <bpmn:sequenceFlow id="f-decisao-testes-corrigir" name="corrigir" sourceRef="decisao-testes" targetRef="desenvolver">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=decisaoDosTestes = "corrigir"</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="f-decisao-testes-cancelar" name="cancelar" sourceRef="decisao-testes" targetRef="tarefa-cancelada" />
+    <bpmn:sequenceFlow id="f-pr-avaliado" sourceRef="aprovar-pr" targetRef="pr-aprovado" />
+    <bpmn:sequenceFlow id="f-pr-ok" name="sim" sourceRef="pr-aprovado" targetRef="abrir-pr">
+      <bpmn:conditionExpression xsi:type="bpmn:tFormalExpression">=prAprovado = true</bpmn:conditionExpression>
+    </bpmn:sequenceFlow>
+    <bpmn:sequenceFlow id="f-pr-cancelar" name="não" sourceRef="pr-aprovado" targetRef="tarefa-cancelada" />
+    <bpmn:sequenceFlow id="f-pr-aberto" sourceRef="abrir-pr" targetRef="tarefa-concluida" />
+  </bpmn:process>
+
+  <bpmndi:BPMNDiagram id="diagrama-dev-flow">
+    <bpmndi:BPMNPlane id="plano-dev-flow" bpmnElement="dev-flow">
+      <bpmndi:BPMNShape id="s-tarefa-recebida" bpmnElement="tarefa-recebida">
+        <dc:Bounds x="152" y="202" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="131" y="245" width="78" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s-preparar-workspace" bpmnElement="preparar-workspace">
+        <dc:Bounds x="240" y="180" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s-refinar" bpmnElement="refinar">
+        <dc:Bounds x="390" y="180" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s-aprovar-refinamento" bpmnElement="aprovar-refinamento">
+        <dc:Bounds x="540" y="180" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s-refinamento-aprovado" bpmnElement="refinamento-aprovado" isMarkerVisible="true">
+        <dc:Bounds x="690" y="195" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="690" y="252" width="50" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s-desenvolver" bpmnElement="desenvolver">
+        <dc:Bounds x="790" y="180" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s-revisar" bpmnElement="revisar">
+        <dc:Bounds x="940" y="180" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s-veredito" bpmnElement="veredito" isMarkerVisible="true">
+        <dc:Bounds x="1090" y="195" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1058" y="172" width="50" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s-testar" bpmnElement="testar">
+        <dc:Bounds x="1190" y="180" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s-testes-aprovados" bpmnElement="testes-aprovados" isMarkerVisible="true">
+        <dc:Bounds x="1340" y="195" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1338" y="172" width="54" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s-aprovar-pr" bpmnElement="aprovar-pr">
+        <dc:Bounds x="1440" y="180" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s-pr-aprovado" bpmnElement="pr-aprovado" isMarkerVisible="true">
+        <dc:Bounds x="1590" y="195" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1590" y="172" width="50" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s-abrir-pr" bpmnElement="abrir-pr">
+        <dc:Bounds x="1690" y="180" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s-tarefa-concluida" bpmnElement="tarefa-concluida">
+        <dc:Bounds x="1842" y="202" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1818" y="245" width="84" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s-decidir-review" bpmnElement="decidir-review">
+        <dc:Bounds x="1065" y="320" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s-decisao-review" bpmnElement="decisao-review" isMarkerVisible="true">
+        <dc:Bounds x="1090" y="450" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1147" y="490" width="46" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s-decidir-testes" bpmnElement="decidir-testes">
+        <dc:Bounds x="1315" y="320" width="100" height="80" />
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s-decisao-testes" bpmnElement="decisao-testes" isMarkerVisible="true">
+        <dc:Bounds x="1340" y="450" width="50" height="50" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1397" y="490" width="46" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="s-tarefa-cancelada" bpmnElement="tarefa-cancelada">
+        <dc:Bounds x="1597" y="457" width="36" height="36" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1571" y="500" width="88" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNShape>
+
+      <bpmndi:BPMNEdge id="e-inicio" bpmnElement="f-inicio">
+        <di:waypoint x="188" y="220" /><di:waypoint x="240" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-preparado" bpmnElement="f-preparado">
+        <di:waypoint x="340" y="220" /><di:waypoint x="390" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-refinado" bpmnElement="f-refinado">
+        <di:waypoint x="490" y="220" /><di:waypoint x="540" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-refinamento-avaliado" bpmnElement="f-refinamento-avaliado">
+        <di:waypoint x="640" y="220" /><di:waypoint x="690" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-refinamento-ok" bpmnElement="f-refinamento-ok">
+        <di:waypoint x="740" y="220" /><di:waypoint x="790" y="220" />
+        <bpmndi:BPMNLabel><dc:Bounds x="752" y="202" width="18" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-refinamento-ajustar" bpmnElement="f-refinamento-ajustar">
+        <di:waypoint x="715" y="195" /><di:waypoint x="715" y="120" /><di:waypoint x="440" y="120" /><di:waypoint x="440" y="180" />
+        <bpmndi:BPMNLabel><dc:Bounds x="560" y="102" width="36" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-desenvolvido" bpmnElement="f-desenvolvido">
+        <di:waypoint x="890" y="220" /><di:waypoint x="940" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-revisado" bpmnElement="f-revisado">
+        <di:waypoint x="1040" y="220" /><di:waypoint x="1090" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-review-aprovado" bpmnElement="f-review-aprovado">
+        <di:waypoint x="1140" y="220" /><di:waypoint x="1190" y="220" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1142" y="224" width="44" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-review-bloqueado" bpmnElement="f-review-bloqueado">
+        <di:waypoint x="1115" y="195" /><di:waypoint x="1115" y="80" /><di:waypoint x="840" y="80" /><di:waypoint x="840" y="180" />
+        <bpmndi:BPMNLabel><dc:Bounds x="952" y="62" width="52" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-review-esgotado" bpmnElement="f-review-esgotado">
+        <di:waypoint x="1115" y="245" /><di:waypoint x="1115" y="320" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1024" y="276" width="86" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-review-decidido" bpmnElement="f-review-decidido">
+        <di:waypoint x="1115" y="400" /><di:waypoint x="1115" y="450" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-decisao-review-corrigir" bpmnElement="f-decisao-review-corrigir">
+        <di:waypoint x="1090" y="475" /><di:waypoint x="840" y="475" /><di:waypoint x="840" y="260" />
+        <bpmndi:BPMNLabel><dc:Bounds x="945" y="457" width="38" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-decisao-review-seguir" bpmnElement="f-decisao-review-seguir">
+        <di:waypoint x="1140" y="475" /><di:waypoint x="1240" y="475" /><di:waypoint x="1240" y="260" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1172" y="457" width="32" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-decisao-review-cancelar" bpmnElement="f-decisao-review-cancelar">
+        <di:waypoint x="1115" y="500" /><di:waypoint x="1115" y="580" /><di:waypoint x="1615" y="580" /><di:waypoint x="1615" y="493" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1340" y="562" width="44" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-testado" bpmnElement="f-testado">
+        <di:waypoint x="1290" y="220" /><di:waypoint x="1340" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-testes-ok" bpmnElement="f-testes-ok">
+        <di:waypoint x="1390" y="220" /><di:waypoint x="1440" y="220" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1402" y="202" width="18" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-testes-falharam" bpmnElement="f-testes-falharam">
+        <di:waypoint x="1365" y="245" /><di:waypoint x="1365" y="320" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1372" y="276" width="20" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-testes-decidido" bpmnElement="f-testes-decidido">
+        <di:waypoint x="1365" y="400" /><di:waypoint x="1365" y="450" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-decisao-testes-corrigir" bpmnElement="f-decisao-testes-corrigir">
+        <di:waypoint x="1365" y="500" /><di:waypoint x="1365" y="540" /><di:waypoint x="820" y="540" /><di:waypoint x="820" y="260" />
+        <bpmndi:BPMNLabel><dc:Bounds x="945" y="522" width="38" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-decisao-testes-cancelar" bpmnElement="f-decisao-testes-cancelar">
+        <di:waypoint x="1390" y="475" /><di:waypoint x="1597" y="475" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1472" y="457" width="44" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-pr-avaliado" bpmnElement="f-pr-avaliado">
+        <di:waypoint x="1540" y="220" /><di:waypoint x="1590" y="220" />
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-pr-ok" bpmnElement="f-pr-ok">
+        <di:waypoint x="1640" y="220" /><di:waypoint x="1690" y="220" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1652" y="202" width="18" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-pr-cancelar" bpmnElement="f-pr-cancelar">
+        <di:waypoint x="1615" y="245" /><di:waypoint x="1615" y="457" />
+        <bpmndi:BPMNLabel><dc:Bounds x="1622" y="340" width="20" height="14" /></bpmndi:BPMNLabel>
+      </bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="e-pr-aberto" bpmnElement="f-pr-aberto">
+        <di:waypoint x="1790" y="220" /><di:waypoint x="1842" y="220" />
+      </bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

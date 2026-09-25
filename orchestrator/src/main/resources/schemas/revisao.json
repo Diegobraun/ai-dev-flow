@@ -1,0 +1,1 @@
+{"type":"object","additionalProperties":false,"required":["veredito","bloqueantes","importantes","resumo"],"properties":{"veredito":{"type":"string","enum":["aprovado","bloqueado"]},"bloqueantes":{"type":"integer","minimum":0},"importantes":{"type":"integer","minimum":0},"resumo":{"type":"string","description":"Um título por bloqueante, com arquivo:linha"}}}

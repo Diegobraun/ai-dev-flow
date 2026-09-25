@@ -1,0 +1,42 @@
+{
+  "components": [
+    {
+      "type": "text",
+      "text": "# Testes integrados falharam: {{tarefa}}\n\n{{testesResumo}}",
+      "id": "decidir-testes-0"
+    },
+    {
+      "type": "text",
+      "text": "---\n\n{{testesDocumento}}",
+      "id": "decidir-testes-1"
+    },
+    {
+      "type": "radio",
+      "label": "Decisão",
+      "key": "decisaoDosTestes",
+      "validate": {
+        "required": true
+      },
+      "values": [
+        {
+          "label": "Voltar para o desenvolvimento",
+          "value": "corrigir"
+        },
+        {
+          "label": "Cancelar a tarefa",
+          "value": "cancelar"
+        }
+      ],
+      "id": "decidir-testes-2"
+    }
+  ],
+  "type": "default",
+  "id": "decidir-testes",
+  "executionPlatform": "Camunda Cloud",
+  "executionPlatformVersion": "8.8.0",
+  "exporter": {
+    "name": "devflow",
+    "version": "0.1.0"
+  },
+  "schemaVersion": 16
+}
